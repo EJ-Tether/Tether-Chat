@@ -12,28 +12,23 @@ ApplicationWindow {
     width: 960
     height: 800
 
-    // DEBUG MODE: see below debug console popup to show the console.log from the QML code during development
-    property bool _debugMode : false
-
     // Custom colors
     property color humanMessageColor: "#fff8e1"  // pale yellow
     property color aiMessageColor: "#e3f2fd"     // pale blue
     property color borderColor: "#E0E0E0"
     property color sendButtonColor: "#2196F3"
 
-    // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner containing the Tab bar,
-    // and the main area, whose nature is defined by the active tab: chat area, configuration form, or "about/help informations"
+    // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner
+    // containing the Tab bar on top, and the main area in the rest of the window. The nature
+    // of the main area is defined by the active tab: either chat area, or configuration form,
+    // or "about/help/licence informations"
     ColumnLayout {
         id: _headerChatareaDivide
         anchors.fill: parent
         width: parent.width
-        Component.onCompleted: {
-            console.log("typeof _consoleMessages=",typeof _consoleMessages);
-            if (typeof _consoleMessages != "undefined") {
-                _debugMode = true ;
-            }
-        }
-        // 1.1 `_menuBar` : Manages the TAB bar and other buttons for the application controls (common to all pages)
+        height: parent.height
+        // 1.1 `_menuBar` : Manages the TAB bar and other buttons for the application controls
+        // (common to all pages).
         RowLayout {
             id: _menuBar
             implicitHeight: 40
@@ -63,33 +58,12 @@ ApplicationWindow {
             }
             Button {
                 id: _displayLicence
-                visible: _tabBar.currentIndex == 2
+                visible: _tabBar.currentIndex === 2
                 text: qsTr("Display Licence")
                 height: 40
                 width:80
                 onClicked: {
                     _debugLogs.open()
-                }
-            }
-
-            Button {
-                id: _openDebugButton
-                text: "Open debug logs"
-                visible: _debugMode
-                height: 40
-                width:80
-                onClicked: {
-                    _debugLogs.open()
-                }
-            }
-            Button {
-                id: _closeDebugButton
-                text: "Close debug logs"
-                visible: _debugMode
-                height: 40
-                width:80
-                onClicked: {
-                    _debugLogs.close()
                 }
             }
             ComboBox {
@@ -106,7 +80,6 @@ ApplicationWindow {
                         // we must ignore it
                         return;
                     }
-                    console.log("Langue sélectionnée:", currentIndex);
                     _settings.language = currentIndex ;
                 }
             }
@@ -123,32 +96,23 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignHCenter
 
-            // 1.2.1 `_chatArea` : Chat Window content
-            // ------------------------------
+            // 1.2.1 `_chatArea` : Chat Window content, composed of:
+            // - a ListView of the former messages from the current dialog
+            // - the input area where the human can type their message.
             ColumnLayout {
                 id: _chatArea
                 width: parent.width
                 Layout.fillHeight: true
-
-                // Debug object
-                Rectangle {
-                    color: "transparent"
-                    border { color: "red" ; width: 5}
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    z:-1
-                }
-
+                Layout.fillWidth: true
 
                 Rectangle {
                     id: _messagesArea
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: "#FAFAFA"
-
                     ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        id: _messageColumn
+                        anchors.fill: parent
                         spacing: 0
 
                         // Zone des messages (ListView)
@@ -163,6 +127,7 @@ ApplicationWindow {
 
                             // Fake model for debugging the GUI
                             model: ListModel {
+                                id:_simulatedChatModel
                                 ListElement {
                                     isLocalMessage: true
                                     text: "first message sent"
@@ -193,42 +158,56 @@ ApplicationWindow {
                             }
 
                             delegate: Rectangle {
-                                id: _messageBubble
-                                width: Math.min(_messageText.implicitWidth + 20, ListView.view.width * 0.8)
-                                height: _messageText.implicitHeight + 20
-                                radius: 12
-                                border.width: 1
-                                border.color: borderColor
-                                color: model.isLocalMessage ? humanMessageColor : aiMessageColor
+                                id: _singleMessageArea
+                                // _singleMessageArea : is the invisible rectangle occupying the full
+                                // width of the window and as high as the message. Inside this
+                                // invisible placeholder we'll display the message bubble, aka the rounded
+                                // rectangle on 80% of the width aligned left or right with the text in it.
+                                Layout.preferredWidth: _messageListView.width
+                                Layout.preferredHeight: _messageBubble.height
+                                implicitHeight: _messageBubble.height
+                                implicitWidth: _messageListView.width
+                                Rectangle {
+                                    id: _messageBubble
+                                    // _messageBubble: the visible rectangle with rounded corners with
+                                    // the message inside.
+                                    width: Math.min(_messageText.implicitWidth + 20, parent.width * 0.8)
+                                    height: _messageText.implicitHeight + 20
+                                    radius: 12
+                                    border.width: 1
+                                    border.color: borderColor
+                                    color: model.isLocalMessage ? humanMessageColor : aiMessageColor
+                                    x: model.isLocalMessage ? 0 : parent.width - width ;
 
-                                // Positionnement horizontal
-                                x: model.isLocalMessage ? 10 :
-                                    (ListView.view.width - width - 10)
+                                    Text {
+                                        id: _messageText
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        text: model.text
+                                        wrapMode: Text.Wrap
+                                        font.pixelSize: 14
+                                        color: "#333333"
+                                        // Définir une largeur maximale pour que implicitHeight soit calculé correctement
+                                        width: parent.width - 20 // 20 pour les marges du parent (messageBubble)
+                                    }
 
-                                Text {
-                                    id: _messageText
-                                    anchors.fill: parent
-                                    anchors.margins: 10
-                                    text: model.text
-                                    wrapMode: Text.Wrap
-                                    font.pixelSize: 14
-                                    color: "#333333"
+                                }
+                                ScrollBar.vertical: ScrollBar {
+                                    policy: ScrollBar.AsNeeded
                                 }
                             }
-                            ScrollBar.vertical: ScrollBar {
-                                policy: ScrollBar.AsNeeded
-                            }
+                            // When the `Interlocutor` model will be implemented as a `QAbstractListModel`,
+                            // we must connect the signals/slots so the QML reflects the new reply
+                            //Connections {
+                            //    target: interlocutor.messageModel
+                            //    function onCountChanged() {
+                            //        _messageListView.positionViewAtEnd()
+                            //    }
+                            //}
                         }
-                        // When the `Interlocutor` model will be implemented as a `QAbstractListModel`,
-                        // we must connect the signals/slots so the QML reflects the new reply
-                        //Connections {
-                        //    target: interlocutor.messageModel
-                        //    function onCountChanged() {
-                        //        _messageListView.positionViewAtEnd()
-                        //    }
-                        //}
                         // Zone de saisie
                         Rectangle {
+                            id: _inputMessageArea
                             Layout.fillWidth: true
                             Layout.preferredHeight: 80
                             color: "white"
@@ -302,36 +281,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 Label {
                     text: "Information Window : PLACEHOLDER, TO BE IMPLEMENTED"
-                }
-            }
-
-
-        }
-
-
-        // Managing console messages in DEBUG MODE : showing the developper
-        // the console messages in a popup window (the debug mode is decided
-        // by the existence of an object _consoleMessage in the root context
-        // of the Qt Quick engine.
-        // NB: I usually find the Debug console useful for debugging the QML
-        // part, i.e. printing messages with `console.log` in various parts
-        // of the JS code.
-        Popup {
-            id: _debugLogs
-            width: parent.width // 880
-            height: parent.height // 640
-            topMargin: 160
-            x: 0
-            y: 160
-
-            ScrollView {
-                anchors.fill: parent
-                TextArea {
-                    width: parent.width
-                    height: parent.height
-                    readOnly: true
-                    text: (typeof _consoleMessages === "undefined")? "":_consoleMessages.consoleMessages
-                    wrapMode: TextEdit.WordWrap
                 }
             }
         }
