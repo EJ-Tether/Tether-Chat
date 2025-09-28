@@ -6,12 +6,14 @@
 Interlocutor::Interlocutor(const QString &apiKey, // Secret API Key
                            QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
                            QString model, // For instance "gpt-4o"
-                           const QString &systemPrompt,
                            QObject *parent)
     : QObject(parent), m_apiKey(apiKey), m_url(url), m_model(model) {
   m_manager = new QNetworkAccessManager(this);
-  m_systemMsg["role"] = "system";
-  m_systemMsg["content"] = systemPrompt;
+}
+
+void Interlocutor::setSystemPrompt(const QString &systemPrompt) {
+    m_systemMsg["role"] = "system";
+    m_systemMsg["content"] = systemPrompt;
 }
 
 void Interlocutor::sendRequest(const QString &prompt) {
@@ -121,3 +123,6 @@ void Interlocutor::sendRequest(const QString &prompt) {
     reply->deleteLater();
   });
 }
+
+// Interlocutor::sendChatMessage()
+// Interlocutor::sendMemoryFileForCuration()

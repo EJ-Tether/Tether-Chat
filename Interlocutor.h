@@ -1,5 +1,3 @@
-#include <exxotools/QmlPropertyHelper.h>
-
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -16,13 +14,15 @@
 class Interlocutor : public QObject {
   Q_OBJECT
  public:
-  explicit Interlocutor(const QString &apiKey, const QString &systemPrompt,
-                        QObject *parent = nullptr);
+  explicit Interlocutor(const QString &apiKey, // Secret API Key
+                           QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
+                           QString model, // For instance "gpt-4o"
+                           QObject *parent);
 
-  Q_INVOKABLE void sendRequest(const QString &prompt);
-  // QML_READONLY_VAR_PROPERTY(title, QString)
+  Q_INVOKABLE void sendRequest(const QString &prompt);  
+  void setSystemPrompt(const QString &systemPrompt);
 
- signals:
+  signals:
   void responseReceived(const QJsonObject &response);
   void errorOccurred(const QString &error);
 

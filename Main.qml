@@ -154,6 +154,33 @@ ApplicationWindow {
                                     isLocalMessage: false
                                     text: "third message received"
                                 }
+                                ListElement {
+                                    isLocalMessage: true
+                                    text: "4th message sent"
+                                }
+
+                                ListElement {
+                                    isLocalMessage: false
+                                    text: "4th message received"
+                                }
+                                ListElement {
+                                    isLocalMessage: true
+                                    text: "5th message sent"
+                                }
+
+                                ListElement {
+                                    isLocalMessage: false
+                                    text: "5th message received"
+                                }
+                                ListElement {
+                                    isLocalMessage: true
+                                    text: "6th message sent"
+                                }
+
+                                ListElement {
+                                    isLocalMessage: false
+                                    text: "6th message received"
+                                }
 
                             }
 
