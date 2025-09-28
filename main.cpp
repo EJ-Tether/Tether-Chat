@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Interlocutor", "Model data");
     engine.rootContext()->setContextProperty("_currentInterlocutor", currentInterlocutor);
 
+
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

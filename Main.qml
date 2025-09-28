@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt.labs.folderlistmodel
-import Qt.labs.platform
 
 import Tether 1.0
 
@@ -17,6 +15,32 @@ ApplicationWindow {
     property color aiMessageColor: "#e3f2fd"     // pale blue
     property color borderColor: "#E0E0E0"
     property color sendButtonColor: "#2196F3"
+
+    // Fonction pour envoyer le message
+    function sendMessage() {
+        var text = messageInput.text.trim();
+        if (text.length > 0) {
+            chatModel.sendMessage(text);
+            messageInput.text = ""; // Effacer le champ de saisie
+        }
+    }
+
+    // Connecter aux signaux de chatModel pour la gestion des erreurs et le défilement
+    Connections {
+        target: chatModel
+        function onChatMessageAdded(message) {
+            _messageListView.positionViewAtEnd();
+        }
+        function onChatError(error) {
+            console.error("Chat Error:", error);
+            // Afficher l'erreur à l'utilisateur, par exemple dans une petite bulle ou une toast
+        }
+        function onTotalTokensChanged() {
+            console.log("Total tokens:", chatModel.totalTokens);
+            // TODO: Mettre à jour un QLabel pour afficher le nombre de tokens
+        }
+    }
+
 
     // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner
     // containing the Tab bar on top, and the main area in the rest of the window. The nature
@@ -63,7 +87,7 @@ ApplicationWindow {
                 height: 40
                 width:80
                 onClicked: {
-                    _debugLogs.open()
+                    // _debugLogs.open() // Si vous voulez toujours l'utiliser pour la licence
                 }
             }
             ComboBox {
@@ -104,6 +128,7 @@ ApplicationWindow {
                 width: parent.width
                 Layout.fillHeight: true
                 Layout.fillWidth: true
+
 
                 Rectangle {
                     id: _messagesArea

@@ -21,6 +21,8 @@ qt_add_qml_module(appTether
         SOURCES settings.h settings.cpp
         SOURCES Interlocutor.cpp Interlocutor.h
         SOURCES DummyInterlocutor.h DummyInterlocutor.cpp
+        SOURCES ChatMessage.h
+        SOURCES ChatModel.h ChatModel.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
