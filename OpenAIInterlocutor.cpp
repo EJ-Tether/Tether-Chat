@@ -7,7 +7,7 @@ OpenAIInterlocutor::OpenAIInterlocutor(const QString &apiKey, // Secret API Key
                            QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
                            QString model, // For instance "gpt-4o"
                            QObject *parent)
-    : QObject(parent), m_apiKey(apiKey), m_url(url), m_model(model) {
+    : Interlocutor(parent), m_apiKey(apiKey), m_url(url), m_model(model) {
   m_manager = new QNetworkAccessManager(this);
 }
 
@@ -16,7 +16,7 @@ void OpenAIInterlocutor::setSystemPrompt(const QString &systemPrompt) {
     m_systemMsg["content"] = systemPrompt;
 }
 
-void Interlocutor::sendRequest(const QString &prompt) {
+void OpenAIInterlocutor::sendRequest(const QString &prompt) {
   QNetworkRequest request(m_url);
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
   request.setRawHeader("Authorization",

@@ -12,9 +12,6 @@
 #include "ChatMessage.h"
 #include "Interlocutor.h" // Ou DummyInterlocutor.h pour le debug
 
-// Déclarer ChatMessage comme un type QML pour une utilisation directe
-// dans les propriétés ou les listes (nécessite Q_GADGET)
-Q_DECLARE_METATYPE(ChatMessage)
 
 class ChatModel : public QAbstractListModel
 {

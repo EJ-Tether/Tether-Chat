@@ -1,30 +1,23 @@
 #include "DummyInterlocutor.h"
 #include <QDebug>
-#include <algorithm> // Pour std::reverse
+#include <algorithm>
 
 DummyInterlocutor::DummyInterlocutor(QObject *parent)
-    : QObject(parent)
+    : Interlocutor(parent)
 {
-    m_apiKey = "dummy API";
     m_responseTimer = new QTimer(this);
     m_responseTimer->setSingleShot(true);
 }
 
-
 void DummyInterlocutor::sendRequest(const QString &prompt)
 {
     qDebug() << "DummyInterlocutor received prompt:" << prompt;
+    m_responseTimer->setInterval(500);
 
-    // Simuler un délai de réponse (par exemple, 500 ms)
-    m_responseTimer->setInterval(500); // Vous pouvez ajuster ce délai
-
-    // Connecter le timer pour émettre la réponse quand il expire
     QObject::connect(m_responseTimer, &QTimer::timeout, this, [this, prompt]() {
-        // Inverser la chaîne de caractères
         QString reversedPrompt = prompt;
         std::reverse(reversedPrompt.begin(), reversedPrompt.end());
 
-        // Construire une réponse QJsonObject qui imite la structure de l'API réelle
         QJsonObject message;
         message["role"] = "assistant";
         message["content"] = "Réponse bidon: " + reversedPrompt;
@@ -41,11 +34,10 @@ void DummyInterlocutor::sendRequest(const QString &prompt)
         responseObj["object"] = "chat.completion";
         responseObj["created"] = QDateTime::currentSecsSinceEpoch();
         responseObj["model"] = "dummy-model";
-        responseObj["usage"] = QJsonObject(); // Un objet vide pour l'usage
+        responseObj["usage"] = QJsonObject();
 
-        qDebug() << "DummyInterlocutor sending reversed response:" << reversedPrompt;
         emit responseReceived(responseObj);
-    }, Qt::SingleShotConnection); // Utilisez Qt::SingleShotConnection pour déconnecter après une seule émission
+    }, Qt::SingleShotConnection);
 
     m_responseTimer->start();
 }

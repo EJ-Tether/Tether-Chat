@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QQmlEngine>
 #include <QTimer>
+#include "Interlocutor.h"
 
 
 class OpenAIInterlocutor : public Interlocutor {
@@ -22,9 +23,10 @@ class OpenAIInterlocutor : public Interlocutor {
   Q_INVOKABLE void sendRequest(const QString &prompt);  
   void setSystemPrompt(const QString &systemPrompt);
 
-  signals:
-  void responseReceived(const QJsonObject &response);
-  void errorOccurred(const QString &error);
+  // Les signaux ci-dessous sont hérités de la classe mère `Interlocutor`
+  // signals:
+  //     void responseReceived(const QJsonObject &response);
+  //     void errorOccurred(const QString &error);
 
  private:
   QUrl m_url;
