@@ -3,7 +3,10 @@
 #include <QQmlContext>
 #include <qobject.h>
 
+#include "ChatMessage.h"
+#include "ChatModel.h"
 #include "Interlocutor.h"
+#include "DummyInterlocutor.h"
 #include "Settings.h"
 
 #define APP_NAME "TetherChat"
@@ -24,6 +27,16 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("_consoleMessages", &consoleMessages);
     qInstallMessageHandler(customMessageHandler);
 #endif
+
+    qmlRegisterType<ChatMessage>("Tether", 1, 0, "ChatMessage");
+    qmlRegisterType<ChatModel>("Tether", 1, 0, "ChatModel");
+
+    // DEBUG CODE : we create the current interlocutor as a DUMMY INTERLOCUTOR. Later in the project, the current
+    // Interlocutor will be changed depending on the choice in the Configuration menu, that will be made persistent
+    // between restarts by storing the last current interlocutor in the .settings
+    Interlocutor *llmInterlocutor = new DummyInterlocutor(&app);
+
+    engine.rootContext()->setContextProperty("_currentInterlocutor", llmInterlocutor);
 
     // Persistent settings management:
     // WORK IN PROGRESS: IMPLEMENT THE C++ OBJECT MANAGING THE APP SETTINGS HERE:

@@ -1,23 +1,24 @@
 #ifndef DUMMYINTERLOCUTOR_H
 #define DUMMYINTERLOCUTOR_H
 
+#include "ChatModel.h"
 #include <QObject>
 #include <QTimer>
 #include <QJsonObject>
 #include <QJsonArray> // Ajouté pour construire la réponse bidon
 
-class DummyInterlocutor : public QObject
+class DummyInterlocutor : public Interlocutor
 {
     Q_OBJECT
 public:
     // Le constructeur doit correspondre à celui de Interlocutor pour être un substitut facile
-    explicit DummyInterlocutor(QObject *parent = nullptr);
+    explicit DummyInterlocutor(QString interlocutorQObject *parent = nullptr);
 
     Q_INVOKABLE void sendRequest(const QString &prompt);
 
 signals:
-    void responseReceived(const QJsonObject &response);
-    void errorOccurred(const QString &error);
+    void dummyResponseReceived(const QJsonObject &response);
+    void dummyErrorOccurred(const QString &error);
 
 private:
     QTimer *m_responseTimer; // Pour simuler un délai de réponse

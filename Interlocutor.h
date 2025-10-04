@@ -14,24 +14,16 @@
 class Interlocutor : public QObject {
   Q_OBJECT
  public:
-  explicit Interlocutor(const QString &apiKey, // Secret API Key
-                           QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
-                           QString model, // For instance "gpt-4o"
-                           QObject *parent);
+  // From the name of the Interlocutor we'll find through the "Configuration" tab and configuration C++ model the
+  // rest of the information: the API Key, the model name, the URL of the endpoint where to direct our requests,
+  // etc... Only the DummyInterlocutor (debug class) needs no such information because there is no LLM involved
+  explicit Interlocutor(QString interlocutorName, QObject *parent);
 
-  Q_INVOKABLE void sendRequest(const QString &prompt);  
-  void setSystemPrompt(const QString &systemPrompt);
+  Q_INVOKABLE virtual void sendRequest(const QString &prompt);
+  virtual void setSystemPrompt(const QString &systemPrompt);
 
   signals:
   void responseReceived(const QJsonObject &response);
   void errorOccurred(const QString &error);
 
- private:
-  QUrl m_url;
-  QString m_apiKey;
-  QString m_model;
-  QNetworkAccessManager *m_manager;
-  QJsonObject m_systemMsg;
-  const int REQUEST_TIMEOUT_MS = 100000;
-  QMap<QNetworkReply *, QTimer *> m_requestTimers;
 };

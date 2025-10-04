@@ -150,64 +150,6 @@ ApplicationWindow {
                             clip: true
                             verticalLayoutDirection: ListView.TopToBottom
 
-                            // Fake model for debugging the GUI
-                            model: ListModel {
-                                id:_simulatedChatModel
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "first message sent"
-                                }
-
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "first message received"
-                                }
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "Very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long second message sent"
-                                }
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "Very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long second answer received"
-                                }
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "third message sent"
-                                }
-
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "third message received"
-                                }
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "4th message sent"
-                                }
-
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "4th message received"
-                                }
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "5th message sent"
-                                }
-
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "5th message received"
-                                }
-                                ListElement {
-                                    isLocalMessage: true
-                                    text: "6th message sent"
-                                }
-
-                                ListElement {
-                                    isLocalMessage: false
-                                    text: "6th message received"
-                                }
-
-                            }
 
                             delegate: Rectangle {
                                 id: _singleMessageArea
