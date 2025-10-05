@@ -3,11 +3,13 @@
 #include <QDebug>
 #include <QUrl>
 
-OpenAIInterlocutor::OpenAIInterlocutor(const QString &apiKey, // Secret API Key
+OpenAIInterlocutor::OpenAIInterlocutor(
+                           QString interlocutorName,
+                           const QString &apiKey, // Secret API Key
                            QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
                            QString model, // For instance "gpt-4o"
                            QObject *parent)
-    : Interlocutor(parent), m_apiKey(apiKey), m_url(url), m_model(model) {
+    : Interlocutor(interlocutorName, parent), m_apiKey(apiKey), m_url(url), m_model(model) {
   m_manager = new QNetworkAccessManager(this);
 }
 

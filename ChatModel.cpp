@@ -306,5 +306,18 @@ void ChatModel::triggerCuration() {
     }
 }
 
-// Enregistrer le type ChatMessage pour qu'il puisse être utilisé avec QVariant
-// QML_DECLARE_TYPE(ChatMessage) // Ceci est utilisé pour les types qui sont des QObject, pas pour Q_GADGETs
+void ChatModel::setInterlocutor(Interlocutor *interlocutor) {
+    // Déconnecter l'ancien interlocuteur s'il existe
+    if (m_interlocutor) {
+        disconnect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
+        disconnect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
+    }
+
+    m_interlocutor = interlocutor;
+
+    // Connecter le nouvel interlocuteur s'il n'est pas nul
+    if (m_interlocutor) {
+        connect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
+        connect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
+    }
+}

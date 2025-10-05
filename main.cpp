@@ -34,20 +34,18 @@ int main(int argc, char *argv[])
     Settings settings;
     engine.rootContext()->setContextProperty("_settings", &settings);
 
-    // ... (votre code pour la console et les traductions) ...
     QObject::connect(&settings, &Settings::retranslate, &app, [&engine, &settings]() {
         engine.retranslate();
     });
 
     // --- Démarrage de l'engine QML ---
-    const QUrl url(u"qrc:/Tether/Main.qml"_qs); // Assurez-vous que le chemin est correct
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
         &app,
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
-    engine.load(url);
+    engine.loadFromModule("Tether", "Main");
 
     return app.exec();
 }

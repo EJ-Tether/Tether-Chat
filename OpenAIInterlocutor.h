@@ -15,10 +15,11 @@
 class OpenAIInterlocutor : public Interlocutor {
   Q_OBJECT
  public:
-  explicit OpenAIInterlocutor(const QString &apiKey, // Secret API Key
-                           QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
-                           QString model, // For instance "gpt-4o"
-                           QObject *parent);
+  explicit OpenAIInterlocutor(  QString interlocutorName,
+                                const QString &apiKey, // Secret API Key
+                                QUrl url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
+                                QString model, // For instance "gpt-4o"
+                                QObject *parent);
 
   Q_INVOKABLE void sendRequest(const QString &prompt);  
   void setSystemPrompt(const QString &systemPrompt);
