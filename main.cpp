@@ -1,13 +1,10 @@
-#include <QGUIApplication>
+#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <qobject.h>
 
-#include "ChatMessage.h"
-#include "ChatModel.h"
-#include "Interlocutor.h"
-#include "DummyInterlocutor.h"
+#include "ChatManager.h" // Inclure le nouveau manager
 #include "Settings.h"
+// ... autres includes
 
 #define APP_NAME "TetherChat"
 #define MAJOR_VERSION 0
@@ -21,54 +18,36 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationName("TetherChat");
     QQmlApplicationEngine engine;
 
-// Activate/deactivate the console message display with the macro CONSOLE_MESSAGES
-#if defined(CONSOLE_MESSAGES)
-    qmlRegisterUncreatableType<ConsoleMessages>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ConsoleMessages", "Model data");
-    engine.rootContext()->setContextProperty("_consoleMessages", &consoleMessages);
-    qInstallMessageHandler(customMessageHandler);
-#endif
+    // --- Enregistrement des types QML ---
+    // Ces types doivent être connus de QML, mais on ne les crée pas depuis QML.
+    qmlRegisterUncreatableType<ChatModel>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ChatModel", "Cannot create ChatModel in QML.");
+    qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Settings", "Cannot create Settings in QML.");
+    // Pas besoin d'enregistrer ChatMessage s'il n'est utilisé que dans le modèle
 
-    qmlRegisterType<ChatMessage>("Tether", 1, 0, "ChatMessage");
-    qmlRegisterType<ChatModel>("Tether", 1, 0, "ChatModel");
+    // --- Création des objets principaux ---
 
-    // DEBUG CODE : we create the current interlocutor as a DUMMY INTERLOCUTOR. Later in the project, the current
-    // Interlocutor will be changed depending on the choice in the Configuration menu, that will be made persistent
-    // between restarts by storing the last current interlocutor in the .settings
-    Interlocutor *llmInterlocutor = new DummyInterlocutor(&app);
+    // 1. Le ChatManager est le point d'entrée principal
+    ChatManager chatManager;
+    engine.rootContext()->setContextProperty("chatManager", &chatManager);
 
-    engine.rootContext()->setContextProperty("_currentInterlocutor", llmInterlocutor);
-
-    // Persistent settings management:
-    // WORK IN PROGRESS: IMPLEMENT THE C++ OBJECT MANAGING THE APP SETTINGS HERE:
+    // 2. L'objet Settings pour la configuration
     Settings settings;
-    qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Settings", "Model data");
     engine.rootContext()->setContextProperty("_settings", &settings);
 
-    // Translations: Managing the change in the current language
+    // ... (votre code pour la console et les traductions) ...
     QObject::connect(&settings, &Settings::retranslate, &app, [&engine, &settings]() {
-        // settings.set_changingLanguage(true);
         engine.retranslate();
-        //settings.set_changingLanguage(false);
     });
 
-    // Temporary architecture: we just set ONE current interlocutor.
-    // TODO: in further versions, we'll have a `ListOfInterlocutors` class that contains the list of all known AI chat partners,
-    // This list is a collection of abstract classes `Interlocutor`. `Interlocutor` is an abstract classe / Interface, that will
-    // be derived in OpenAIInterlocutor, AnthropicInterlocutor, DummyInterlocutor (for debut), LocalInterlocutor (for
-    // self-hosting), etc...
-    // NB: When the currentInterlocutor will change, a signal will activate the slot currentInterlocutorChanged to update the
-    // GUI dynamically
-    Interlocutor *currentInterlocutor = nullptr ;
-    qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Interlocutor", "Model data");
-    engine.rootContext()->setContextProperty("_currentInterlocutor", currentInterlocutor);
-
-
+    // --- Démarrage de l'engine QML ---
+    const QUrl url(u"qrc:/Tether/Main.qml"_qs); // Assurez-vous que le chemin est correct
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
         &app,
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
-    engine.loadFromModule("Tether", "Main");
+    engine.load(url);
+
     return app.exec();
 }

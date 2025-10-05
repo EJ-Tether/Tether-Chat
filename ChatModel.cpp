@@ -5,9 +5,9 @@
 #include <QJsonArray>
 #include <QStandardPaths> // Pour les chemins par défaut
 
-ChatModel::ChatModel(Interlocutor *interlocutor, QObject *parent)
+ChatModel::ChatModel(QObject *parent)
     : QAbstractListModel(parent),
-    m_interlocutor(interlocutor),
+    m_interlocutor(nullptr),
     m_totalTokens(0)
 {
     if (m_interlocutor) {

@@ -10,7 +10,7 @@ class DummyInterlocutor : public Interlocutor
 {
     Q_OBJECT
 public:
-    explicit DummyInterlocutor(QObject *parent = nullptr);
+    explicit DummyInterlocutor(QString interlocutorName, QObject *parent = nullptr);
 
     Q_INVOKABLE void sendRequest(const QString &prompt) override;
 

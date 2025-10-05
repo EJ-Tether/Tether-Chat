@@ -28,7 +28,9 @@ public:
     };
     Q_ENUM(ChatMessageRoles)
 
-    explicit ChatModel(Interlocutor *interlocutor, QObject *parent = nullptr);
+    explicit ChatModel(QObject *parent = nullptr);
+    void setInterlocutor(Interlocutor* interlocutor) ;
+
     ~ChatModel();
 
     // Méthodes de QAbstractListModel

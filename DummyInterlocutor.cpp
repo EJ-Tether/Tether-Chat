@@ -2,8 +2,8 @@
 #include <QDebug>
 #include <algorithm>
 
-DummyInterlocutor::DummyInterlocutor(QObject *parent)
-    : Interlocutor(parent)
+DummyInterlocutor::DummyInterlocutor(QString interlocutorName, QObject *parent)
+    : Interlocutor(interlocutorName, parent)
 {
     m_responseTimer = new QTimer(this);
     m_responseTimer->setSingleShot(true);
