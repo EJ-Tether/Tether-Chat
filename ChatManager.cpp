@@ -27,13 +27,13 @@ ChatManager::~ChatManager() {
 
 void ChatManager::loadInterlocutors() {
     // Pour l'instant, on charge juste le Dummy en dur.
-    // Plus tard, vous chargerez cela depuis votre objet Settings.
+    // Plus tard, on chargera tous les Interlocutor connus depuis l'objet Settings (qui reflète l'onglet Configuration)
     auto dummy = new DummyInterlocutor("Dummy", this);
     m_interlocutors.insert("Dummy", dummy);
 
-    // Exemple de comment vous ajouteriez un vrai interlocuteur
+    // Exemple de comment on ajouterai un vrai interlocuteur
     // auto openai = new OpenAIInterlocutor("ChatGPT-4o", this);
-    // openai->setApiKey("VOTRE_CLÉ_API");
+    // openai->setApiKey("MA_CLÉ_API");
     // m_interlocutors.insert("ChatGPT-4o", openai);
 
     emit interlocutorNamesChanged();
