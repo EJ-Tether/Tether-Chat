@@ -105,7 +105,10 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response) {
         ChatMessage &lastUserMessage = m_messages.last();
         if (lastUserMessage.isLocalMessage()) { // Assurez-vous que c'est bien le message de l'utilisateur
             lastUserMessage.setPromptTokens(promptTokens); // Tokens envoyés pour la requête
-            // Aucun signal besoin ici car on ne modifie pas le texte
+            // On a changé le nombre de tokens émis, on doit le signaler au QML par un signal:
+            int lastIndex = m_messages.count() - 1;
+            QModelIndex modelIndex = index(lastIndex);
+            emit dataChanged(modelIndex, modelIndex, {PromptTokensRole});
         }
     }
 

@@ -3,8 +3,7 @@
 #include <QQmlContext>
 
 #include "ChatManager.h" // Inclure le nouveau manager
-#include "Settings.h"
-// ... autres includes
+#include "settings.h"
 
 #define APP_NAME "TetherChat"
 #define MAJOR_VERSION 0
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
 
     // 1. Le ChatManager est le point d'entrée principal
     ChatManager chatManager;
-    engine.rootContext()->setContextProperty("chatManager", &chatManager);
+    engine.rootContext()->setContextProperty("_chatManager", &chatManager);
 
     // 2. L'objet Settings pour la configuration
     Settings settings;

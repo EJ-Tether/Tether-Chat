@@ -16,18 +16,19 @@ ApplicationWindow {
     property color borderColor: "#E0E0E0"
     property color sendButtonColor: "#2196F3"
 
+    property var currentChatModel: _chatManager.chatModel
+
     // Fonction pour envoyer le message
     function sendMessage() {
         var text = messageInput.text.trim();
         if (text.length > 0) {
-            chatModel.sendMessage(text);
-            messageInput.text = ""; // Effacer le champ de saisie
+            currentChatModel.sendMessage(text);
+            messageInput.text = "";
         }
     }
-
     // Connecter aux signaux de chatModel pour la gestion des erreurs et le défilement
     Connections {
-        target: chatModel
+        target: currentChatModel
         function onChatMessageAdded(message) {
             _messageListView.positionViewAtEnd();
         }
@@ -107,6 +108,16 @@ ApplicationWindow {
                     _settings.language = currentIndex ;
                 }
             }
+            ComboBox {
+                id: interlocutorSelector
+                model: _chatManager.interlocutorNames // Le ComboBox se remplit automatiquement
+                currentIndex: model.indexOf(_chatManager.activeInterlocutorName) // Sélectionne l'actif
+
+                onActivated: (index) => {
+                                 // Quand l'utilisateur choisit, on appelle le manager
+                                 chatManager.switchToInterlocutor(interlocutorSelector.model[index])
+                             }
+            }
             Item {
                 width:40
             }
@@ -149,7 +160,7 @@ ApplicationWindow {
                             spacing: 15
                             clip: true
                             verticalLayoutDirection: ListView.TopToBottom
-
+                            model: _chatManager.chatModel
 
                             delegate: Rectangle {
                                 id: _singleMessageArea
@@ -192,12 +203,12 @@ ApplicationWindow {
                             }
                             // When the `Interlocutor` model will be implemented as a `QAbstractListModel`,
                             // we must connect the signals/slots so the QML reflects the new reply
-                            //Connections {
-                            //    target: interlocutor.messageModel
-                            //    function onCountChanged() {
-                            //        _messageListView.positionViewAtEnd()
-                            //    }
-                            //}
+                            Connections {
+                                target: _chatManager.chatModel
+                                function onCountChanged() {
+                                    _messageListView.positionViewAtEnd()
+                                }
+                            }
                         }
                         // Zone de saisie
                         Rectangle {
