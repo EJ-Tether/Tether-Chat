@@ -162,7 +162,7 @@ ApplicationWindow {
                             verticalLayoutDirection: ListView.TopToBottom
                             model: _chatManager.chatModel
 
-                            delegate: Rectangle {
+                            delegate: Item {
                                 id: _singleMessageArea
                                 // _singleMessageArea : is the invisible rectangle occupying the full
                                 // width of the window and as high as the message. Inside this
@@ -182,7 +182,9 @@ ApplicationWindow {
                                     border.width: 1
                                     border.color: borderColor
                                     color: model.isLocalMessage ? humanMessageColor : aiMessageColor
-                                    x: model.isLocalMessage ? 0 : parent.width - width ;
+                                    anchors.top: parent.top
+                                    anchors.left: model.isLocalMessage ? parent.left : undefined // Ancre à gauche si humain
+                                    anchors.right: model.isLocalMessage ? undefined : parent.right // Ancre à droite si IA
 
                                     Text {
                                         id: _messageText
