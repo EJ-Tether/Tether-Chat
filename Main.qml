@@ -197,9 +197,6 @@ ApplicationWindow {
                                     }
 
                                 }
-                                ScrollBar.vertical: ScrollBar {
-                                    policy: ScrollBar.AsNeeded
-                                }
                             }
                             // When the `Interlocutor` model will be implemented as a `QAbstractListModel`,
                             // we must connect the signals/slots so the QML reflects the new reply
