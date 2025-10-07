@@ -214,52 +214,61 @@ ApplicationWindow {
                         Rectangle {
                             id: _inputMessageArea
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 80
+                            height: 160
                             color: "white"
                             border.color: borderColor
                             border.width: 1
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 10
+                            ScrollView {
+                                id: scrollView
+
+                                height: 150
+                                width: parent.width - 70
+                                anchors { top: parent.top ; left: parents.left }
+
+                                //Layout.fillHeight: true
+                                clip: true
+
+                                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
                                 TextArea {
                                     id: messageInput
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    placeholderText: "Tapez votre message..."
-                                    wrapMode: TextArea.Wrap
-                                    font.pixelSize: 14
-                                    selectByMouse: true
+                                    height: 150
+                                    width: parent.width - 70
+                                    wrapMode: Text.WordWrap
+                                    placeholderText: "Saisissez votre message ici..."
 
-                                    Keys.onPressed: function(event) {
-                                        if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-                                            sendMessage()
-                                            event.accepted = true
-                                        }
+                                    onContentHeightChanged: {
+                                        scrollView.ScrollBar.vertical.position = 1.0;
+                                    }
+
+                                    Component.onCompleted: {
+                                        forceActiveFocus()
                                     }
                                 }
 
-                                Button {
-                                    id: sendButton
-                                    Layout.preferredWidth: 60
-                                    Layout.preferredHeight: 40
-                                    text: "Envoi"
-                                    background: Rectangle {
-                                        color: sendButton.enabled ? sendButtonColor : "lightgray"
-                                        radius: 6
-                                    }
-                                    contentItem: Text {
-                                        text: sendButton.text
-                                        color: "white"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        font.bold: true
-                                    }
+                            }
 
-                                    onClicked: sendMessage()
-                                    enabled: messageInput.text.trim().length > 0
+                            Button {
+                                id: sendButton
+                                width: 60
+                                height: 30
+                                anchors { verticalCenter: parent.verticalCenter ; right: parent.right }
+                                text: "Envoi"
+                                background: Rectangle {
+                                    color: sendButton.enabled ? sendButtonColor : "lightgray"
+                                    radius: 6
                                 }
+                                contentItem: Text {
+                                    text: sendButton.text
+                                    color: "white"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.bold: true
+                                }
+
+                                onClicked: sendMessage()
+                                enabled: messageInput.text.trim().length > 0
                             }
                         }
                     }
