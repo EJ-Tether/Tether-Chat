@@ -299,9 +299,7 @@ void ChatModel::triggerCuration() {
             }
             endRemoveRows();
             qDebug() << numToRemove << "messages removed during dummy curation.";
-            // Après suppression, il faudrait réécrire le fichier jsonl,
-            // ou marquer ces messages comme "curés" sans les supprimer du fichier historique.
-            // Pour l'instant, on se concentre sur le modèle en mémoire.
+            rewriteChatFile();
             updateTokenCount();
             // Après une vraie curation, il faudrait sauvegarder la mémoire curée
             // dans un fichier séparé et mettre à jour le fichier de chat courant.
@@ -323,4 +321,25 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor) {
         connect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
         connect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
     }
+}
+
+void ChatModel::rewriteChatFile()
+{
+    if (m_currentChatFilePath.isEmpty()) {
+        return; // Pas de fichier à réécrire
+    }
+
+    QFile file(m_currentChatFilePath);
+    // On ouvre en mode écriture seule, ce qui tronque (efface) le fichier existant.
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        qWarning() << "Failed to open chat file for rewriting:" << m_currentChatFilePath;
+        return;
+    }
+
+    QTextStream stream(&file);
+    for (const ChatMessage &message : m_messages) {
+        stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
+    }
+    file.close();
+    qDebug() << "Chat file rewritten successfully:" << m_currentChatFilePath;
 }

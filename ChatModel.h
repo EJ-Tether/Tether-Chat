@@ -78,6 +78,7 @@ private:
     const int MAX_LIVE_MEMORY_TOKENS = 100000;
     // Seuil de déclenchement de la curation (par exemple, 120K)
     const int CURATION_TRIGGER_TOKENS = 120000;
+    void rewriteChatFile();
 };
 
 #endif // CHATMODEL_H
