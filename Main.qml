@@ -1,3 +1,4 @@
+// Begin source file Main.qml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -204,7 +205,7 @@ ApplicationWindow {
                             // we must connect the signals/slots so the QML reflects the new reply
                             Connections {
                                 target: _chatManager.chatModel
-                                function onCountChanged() {
+                                function onChatMessageAdded() {
                                     _messageListView.positionViewAtEnd()
                                 }
                             }
@@ -223,7 +224,7 @@ ApplicationWindow {
 
                                 height: 150
                                 width: parent.width - 70
-                                anchors { top: parent.top ; left: parents.left }
+                                anchors { top: parent.top ; left: parent.left }
 
                                 //Layout.fillHeight: true
                                 clip: true
@@ -276,13 +277,158 @@ ApplicationWindow {
             // 1.2.2 `_configArea` : Configuration form: IP address of the API endpoint, API Key,
             // Size of the rolling context, directories used for data storage, ...
             // ------------------------------
-            ColumnLayout {
+            // 1.2.2 `_configArea` : Fenêtre de Configuration
+            RowLayout {
                 id: _configArea
-                visible: true
-                width: parent.width
+                Layout.fillWidth: true
                 Layout.fillHeight: true
-                Label {
-                    text: "Configuration Window : PLACEHOLDER, TO BE IMPLEMENTED"
+                spacing: 10
+                visible: _tabBar.currentIndex === 1 // S'assurer que la visibilité est bien gérée
+
+                // --- Panneau de gauche : Liste des interlocuteurs ---
+                Frame {
+                    Layout.preferredWidth: 200
+                    Layout.fillHeight: true
+
+                    ColumnLayout {
+                        anchors.fill: parent
+
+                        Label {
+                            text: "Interlocutors"
+                            font.bold: true
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        ListView {
+                            id: configListView
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            model: _chatManager.interlocutorNames
+                            currentIndex: -1
+
+                            delegate: ItemDelegate {
+                                text: modelData
+                                width: parent.width
+                                highlighted: ListView.isCurrentItem
+                                onClicked: {
+                                    configListView.currentIndex = index;
+                                    _chatManager.selectConfigToEdit(modelData);
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Add New Interlocutor"
+                            Layout.fillWidth: true
+                            onClicked: {
+                                configListView.currentIndex = -1; // Désélectionner
+                                _chatManager.createNewConfig();
+                            }
+                        }
+                    }
+                }
+
+                // --- Panneau de droite : Formulaire de configuration ---
+                Frame {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    // On affiche le formulaire seulement si un item est sélectionné ou en cours de création
+                    enabled: _chatManager.currentConfig !== null
+
+                    ScrollView {
+                        anchors.fill: parent
+
+                        GridLayout {
+                            width: parent.width
+                            columns: 2
+
+                            // Le nom (ne peut pas être édité pour un existant pour l'instant)
+                            Label { text: "Name:" }
+                            TextField {
+                                id: nameField
+                                Layout.fillWidth: true
+                                text: _chatManager.currentConfig ? _chatManager.currentConfig.name : ""
+                                placeholderText: "Unique name (e.g., 'Work Assistant')"
+                                // Synchroniser la valeur vers le C++
+                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.name = text
+                            }
+
+                            // Le type
+                            Label { text: "Type:" }
+                            ComboBox {
+                                id: typeComboBox
+                                Layout.fillWidth: true
+                                model: _chatManager.availableInterlocutorTypes
+                                currentIndex: _chatManager.currentConfig ? model.indexOf(_chatManager.currentConfig.type) : -1
+                                onActivated: if (_chatManager.currentConfig) _chatManager.currentConfig.type = model[index]
+                            }
+
+                            // Clé API
+                            Label { text: "API Key:" }
+                            TextField {
+                                id: apiKeyField
+                                Layout.fillWidth: true
+                                text: _chatManager.currentConfig ? _chatManager.currentConfig.apiKey : ""
+                                placeholderText: "sk-..."
+                                echoMode: TextInput.Password
+                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.apiKey = text
+                            }
+
+                            // Endpoint URL
+                            Label { text: "Endpoint URL:" }
+                            TextField {
+                                id: endpointUrlField
+                                Layout.fillWidth: true
+                                text: _chatManager.currentConfig ? _chatManager.currentConfig.endpointUrl : ""
+                                placeholderText: "https://api.openai.com/v1/chat/completions"
+                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.endpointUrl = text
+                            }
+
+                            // Instructions Personnalisées (System Prompt)
+                            Label {
+                                text: "Custom Instructions:"
+                                Layout.alignment: Qt.AlignTop
+                            }
+                            TextArea {
+                                id: systemPromptArea
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 200
+                                text: _chatManager.currentConfig ? _chatManager.currentConfig.systemPrompt : ""
+                                placeholderText: "You are a helpful assistant..."
+                                wrapMode: Text.Wrap
+                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.systemPrompt = text
+                            }
+
+                            // Espace vide pour pousser les boutons en bas
+                            Item { Layout.fillHeight: true; Layout.columnSpan: 2 }
+
+                            // Boutons d'action
+                            Item {} // Cellule vide
+                            RowLayout {
+                                Layout.alignment: Qt.AlignRight
+                                Button {
+                                    text: "Save Changes"
+                                    highlighted: true
+                                    onClicked: {
+                                        if (_chatManager.saveConfig(_chatManager.currentConfig)) {
+                                            // Succès ! On pourrait afficher une notification.
+                                            configListView.currentIndex = configListView.model.indexOf(nameField.text)
+                                        } else {
+                                            // Échec, afficher une erreur.
+                                        }
+                                    }
+                                }
+                                Button {
+                                    text: "Delete"
+                                    // ... logique de suppression avec confirmation ...
+                                    // !!! DANGEREUX !!!
+                                    // POUR L'INSTANT CA NE FAIT RIEN...
+                                    // MAIS DEMANDER DEUX OU TROIS CONFIRMATION CLAIRE AVANT D'EFFACER QUOIQUE CE SOIT !!!
+                                }
+                            }
+                        }
+                    }
                 }
             }
             // 1.2.3 `_infoArea` : Information page, versions, details, URL of the github, ...
@@ -299,3 +445,4 @@ ApplicationWindow {
         }
     }
 }
+// End Source File Main.qml

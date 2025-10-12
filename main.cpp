@@ -1,7 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-
+#include "InterlocutorConfig.h"
 #include "ChatManager.h" // Inclure le nouveau manager
 #include "settings.h"
 
@@ -22,6 +22,8 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableType<ChatModel>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ChatModel", "Cannot create ChatModel in QML.");
     qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Settings", "Cannot create Settings in QML.");
     // Pas besoin d'enregistrer ChatMessage s'il n'est utilisé que dans le modèle
+    qmlRegisterType<InterlocutorConfig>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "InterlocutorConfig");
+
 
     // --- Création des objets principaux ---
 

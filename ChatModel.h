@@ -1,3 +1,4 @@
+// Begin Source File ChatModel.h
 #ifndef CHATMODEL_H
 #define CHATMODEL_H
 
@@ -58,6 +59,7 @@ signals:
     void chatMessageAdded(const ChatMessage &message);
     void chatError(const QString &error);
     void curationNeeded(); // Signal pour indiquer qu'une curation est nécessaire
+    void curationFinished(bool success); // Signal utile pour notifier l'UI
 
 private slots:
     void handleInterlocutorResponse(const QJsonObject &response);
@@ -75,10 +77,19 @@ private:
     int m_totalTokens;
 
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    const int MAX_LIVE_MEMORY_TOKENS = 100000;
+    const int BASE_LIVE_MEMORY_TOKENS = 100000;
     // Seuil de déclenchement de la curation (par exemple, 120K)
     const int CURATION_TRIGGER_TOKENS = 120000;
     void rewriteChatFile();
+
+    // Gestion de la curation
+    QString getOlderMemoryFilePath() const; // Donne le chemin du fichier de mémoire ancienne
+    QString loadOlderMemory(); // Charge le contenu de la mémoire ancienne
+    void saveOlderMemory(const QString& content); // Sauvegarde la mémoire ancienne
+    // Flags pour gérer le processus de curation asynchrone
+    bool m_isCurationInProgress = false;
+    bool m_isWaitingForCurationResponse = false;
 };
 
 #endif // CHATMODEL_H
+// End Source File ChatModel.h

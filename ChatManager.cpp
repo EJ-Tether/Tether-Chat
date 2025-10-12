@@ -2,6 +2,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include "DummyInterlocutor.h"
 
 ChatManager::ChatManager(QObject *parent)
     : QObject(parent), m_chatModel(new ChatModel(this))
@@ -13,9 +14,18 @@ ChatManager::ChatManager(QObject *parent)
         dir.mkpath(".");
     }
 
-    loadInterlocutors();
+    loadInterlocutorsFromDisk();
 
-    // Par défaut, activer le premier interlocuteur trouvé
+    if (m_interlocutors.isEmpty()) {
+        qInfo() << "No interlocutors configured. Creating a default Dummy.";
+        createNewConfig();
+        m_currentConfig->setName("Dummy");
+        m_currentConfig->setType("Dummy");
+        saveConfig(m_currentConfig);
+    }
+
+    // Activer le premier interlocuteur de la liste
+    // TODO : Plus tard: activer le dernier interlocuteur courant (qui sera sauvegardé dans le .settings)
     if (!m_interlocutors.isEmpty()) {
         switchToInterlocutor(m_interlocutors.firstKey());
     }
@@ -59,4 +69,126 @@ void ChatManager::switchToInterlocutor(const QString &name) {
 
     m_activeInterlocutorName = name;
     emit activeInterlocutorNameChanged();
+}
+
+
+InterlocutorConfig* ChatManager::currentConfig() const {
+    return m_currentConfig;
+}
+
+QStringList ChatManager::availableInterlocutorTypes() const {
+    // Plus tard, cette liste pourrait être plus dynamique
+    return {"Dummy", "OpenAI", "Anthropic", "Gemini"};
+}
+
+void ChatManager::selectConfigToEdit(const QString &name) {
+    for (auto config : m_allConfigs) {
+        if (config->name() == name) {
+            m_currentConfig = config;
+            emit currentConfigChanged();
+            return;
+        }
+    }
+}
+
+void ChatManager::createNewConfig() {
+    // On crée un nouvel objet de config vide
+    m_currentConfig = new InterlocutorConfig(this);
+    emit currentConfigChanged();
+}
+
+bool ChatManager::saveConfig(InterlocutorConfig *config) {
+    if (!config || config->name().isEmpty()) {
+        qWarning() << "Cannot save config with an empty name.";
+        return false;
+    }
+
+    // Vérifier si une config avec ce nom existe déjà
+    InterlocutorConfig* existingConfig = nullptr;
+    for(auto c : m_allConfigs) {
+        if(c->name() == config->name()) {
+            existingConfig = c;
+            break;
+        }
+    }
+
+    if (existingConfig) { // Mise à jour
+        // Copier les propriétés (le QML a modifié directement l'objet)
+        qDebug() << "Updating existing config:" << config->name();
+    } else { // Création
+        qDebug() << "Saving new config:" << config->name();
+        m_allConfigs.append(config);
+    }
+
+    // Recréer l'interlocuteur concret correspondant
+    if (m_interlocutors.contains(config->name())) {
+        delete m_interlocutors.take(config->name());
+    }
+    Interlocutor* newInterlocutor = createInterlocutorFromConfig(config);
+    m_interlocutors.insert(config->name(), newInterlocutor);
+
+    saveInterlocutorsToDisk();
+    emit interlocutorNamesChanged(); // Mettre à jour les ComboBox !
+    return true;
+}
+
+void ChatManager::deleteConfig(const QString &name) {
+    // ... (logique pour supprimer la config de m_allConfigs et l'interlocuteur de m_interlocutors)
+    // ... (puis sauvegarder et émettre les signaux de changement)
+}
+
+
+void ChatManager::loadInterlocutorsFromDisk() {
+    QFile file(m_chatFilesPath + "/interlocutors.json");
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning("Couldn't open interlocutors.json");
+        return;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonArray configArray = doc.array();
+
+    for (const QJsonValue &value : configArray) {
+        QJsonObject obj = value.toObject();
+        InterlocutorConfig* config = new InterlocutorConfig(this);
+        config->read(obj);
+        m_allConfigs.append(config);
+
+        Interlocutor* interlocutor = createInterlocutorFromConfig(config);
+        m_interlocutors.insert(config->name(), interlocutor);
+    }
+
+    emit interlocutorNamesChanged();
+}
+
+void ChatManager::saveInterlocutorsToDisk() {
+    QJsonArray configArray;
+    for (const auto config : m_allConfigs) {
+        QJsonObject obj;
+        config->write(obj);
+        configArray.append(obj);
+    }
+
+    QFile file(m_chatFilesPath + "/interlocutors.json");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qWarning("Couldn't open interlocutors.json for writing");
+        return;
+    }
+    file.write(QJsonDocument(configArray).toJson(QJsonDocument::Indented));
+}
+
+Interlocutor* ChatManager::createInterlocutorFromConfig(InterlocutorConfig* config) {
+    // C'est une "factory" qui crée le bon type d'objet en fonction de la config
+    if (config->type() == "Dummy") {
+        return new DummyInterlocutor(config->name(), this);
+    }
+    // else if (config->type() == "OpenAI") {
+    //     auto openAI = new OpenAIInterlocutor(config->name(), this);
+    //     openAI->setApiKey(config->apiKey());
+    //     // ... etc ...
+    //     return openAI;
+    // }
+
+    qWarning() << "Unknown interlocutor type:" << config->type() << ". Creating a Dummy as fallback.";
+    return new DummyInterlocutor(config->name(), this);
 }

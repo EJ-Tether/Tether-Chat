@@ -1,0 +1,59 @@
+#include "InterlocutorConfig.h"
+
+InterlocutorConfig::InterlocutorConfig(QObject *parent) : QObject(parent) {}
+
+QString InterlocutorConfig::name() const { return m_name; }
+void InterlocutorConfig::setName(const QString &name) {
+    if (m_name != name) {
+        m_name = name;
+        emit nameChanged();
+    }
+}
+
+QString InterlocutorConfig::type() const { return m_type; }
+void InterlocutorConfig::setType(const QString &type) {
+    if (m_type != type) {
+        m_type = type;
+        emit typeChanged();
+    }
+}
+
+QString InterlocutorConfig::apiKey() const { return m_apiKey; }
+void InterlocutorConfig::setApiKey(const QString &apiKey) {
+    if (m_apiKey != apiKey) {
+        m_apiKey = apiKey;
+        emit apiKeyChanged();
+    }
+}
+
+QString InterlocutorConfig::endpointUrl() const { return m_endpointUrl; }
+void InterlocutorConfig::setEndpointUrl(const QString &endpointUrl) {
+    if (m_endpointUrl != endpointUrl) {
+        m_endpointUrl = endpointUrl;
+        emit endpointUrlChanged();
+    }
+}
+
+QString InterlocutorConfig::systemPrompt() const { return m_systemPrompt; }
+void InterlocutorConfig::setSystemPrompt(const QString &systemPrompt) {
+    if (m_systemPrompt != systemPrompt) {
+        m_systemPrompt = systemPrompt;
+        emit systemPromptChanged();
+    }
+}
+
+void InterlocutorConfig::read(const QJsonObject &json) {
+    setName(json["name"].toString());
+    setType(json["type"].toString());
+    setApiKey(json["apiKey"].toString());
+    setEndpointUrl(json["endpointUrl"].toString());
+    setSystemPrompt(json["systemPrompt"].toString());
+}
+
+void InterlocutorConfig::write(QJsonObject &json) const {
+    json["name"] = m_name;
+    json["type"] = m_type;
+    json["apiKey"] = m_apiKey;
+    json["endpointUrl"] = m_endpointUrl;
+    json["systemPrompt"] = m_systemPrompt;
+}

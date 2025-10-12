@@ -25,6 +25,7 @@ qt_add_qml_module(appTether
         SOURCES ChatModel.h ChatModel.cpp
         SOURCES OpenAIInterlocutor.h OpenAIInterlocutor.cpp
         SOURCES ChatManager.cpp ChatManager.h
+        SOURCES InterlocutorConfig.cpp Interlocutor.h
 
 )
 
