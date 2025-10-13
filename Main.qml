@@ -162,7 +162,10 @@ ApplicationWindow {
                             clip: true
                             verticalLayoutDirection: ListView.TopToBottom
                             model: _chatManager.chatModel
-
+                            Component.onCompleted: {
+                                // On demande à la vue de se positionner à la fin de son contenu.
+                                positionViewAtEnd()
+                            }
                             delegate: Item {
                                 id: _singleMessageArea
                                 // _singleMessageArea : is the invisible rectangle occupying the full
