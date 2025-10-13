@@ -1,3 +1,4 @@
+// Begin Source File: DummyInterlocutor.h
 #ifndef DUMMYINTERLOCUTOR_H
 #define DUMMYINTERLOCUTOR_H
 
@@ -19,3 +20,4 @@ private:
 };
 
 #endif // DUMMYINTERLOCUTOR_H
+// End Source File: DummyInterlocutor.h

@@ -62,7 +62,7 @@ void ChatModel::sendMessage(const QString &messageText) {
     }
 
     // 1. Ajouter le message de l'utilisateur au modèle
-    ChatMessage userMessage(true, messageText, QDateTime::currentDateTime(), 0, 0, "user");
+    ChatMessage userMessage(true, messageText, QDateTime::currentDateTime(), messageText.length()/4, 0, "user");
     addMessage(userMessage);
 
     // TODO: Estimer les tokens du prompt pour le message utilisateur avant d'envoyer
