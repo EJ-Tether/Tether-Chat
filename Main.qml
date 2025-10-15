@@ -82,6 +82,9 @@ ApplicationWindow {
             Item {
                 Layout.fillWidth: true
             }
+            Label {
+                text: "Session cost: " + _chatManager.chatModel.cumulativeTokenCost + " tokens"
+            }
             Button {
                 id: _displayLicence
                 visible: _tabBar.currentIndex === 2
@@ -222,9 +225,15 @@ ApplicationWindow {
                             border.color: borderColor
                             border.width: 1
 
+                            Item {
+                                id: _filler
+                                width: 10
+                                height: 10
+                                anchors { top: parent.top ; left: parent.left }
+                            }
                             ScrollView {
                                 id: scrollView
-
+                                anchors { top: parent.top ; left: _filler.right }
                                 height: 150
                                 width: parent.width - 70
                                 anchors { top: parent.top ; left: parent.left }
@@ -428,6 +437,10 @@ ApplicationWindow {
                                     // !!! DANGEREUX !!!
                                     // POUR L'INSTANT CA NE FAIT RIEN...
                                     // MAIS DEMANDER DEUX OU TROIS CONFIRMATION CLAIRE AVANT D'EFFACER QUOIQUE CE SOIT !!!
+                                }
+                                Button {
+                                    text: "Reset Session Cost"
+                                    onClicked: _chatManager.chatModel.resetTokenCost()
                                 }
                             }
                         }

@@ -1,3 +1,4 @@
+// Begin source file settings.h
 #ifndef SETTINGS_H
 #define SETTINGS_H
 #include <QSettings>
@@ -26,3 +27,4 @@ private:
 };
 
 #endif // SETTINGS_H
+       // End source file settings.h

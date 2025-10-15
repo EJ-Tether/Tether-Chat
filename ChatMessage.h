@@ -1,3 +1,4 @@
+// Begin source file ChatMessage.h
 #ifndef CHATMESSAGE_H
 #define CHATMESSAGE_H
 
@@ -75,3 +76,4 @@ private:
 };
 
 #endif // CHATMESSAGE_H
+// End source file ChatMessage.h

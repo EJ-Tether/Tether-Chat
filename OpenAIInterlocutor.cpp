@@ -1,3 +1,4 @@
+// Begin source file OpenAIInterlocutor.cpp
 #include "OpenAIInterlocutor.h"
 
 #include <QDebug>
@@ -128,3 +129,4 @@ void OpenAIInterlocutor::sendRequest(const QString &prompt) {
 
 // OpenAIInterlocutor::sendChatMessage()
 // OpenAIInterlocutor::sendMemoryFileForCuration()
+//End source file OpenAIInterlocutor.cpp

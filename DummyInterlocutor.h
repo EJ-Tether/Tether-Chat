@@ -13,7 +13,7 @@ class DummyInterlocutor : public Interlocutor
 public:
     explicit DummyInterlocutor(QString interlocutorName, QObject *parent = nullptr);
 
-    Q_INVOKABLE void sendRequest(const QString &prompt) override;
+    Q_INVOKABLE virtual void sendRequest(const QList<ChatMessage> &history) override;
 
 private:
     QTimer *m_responseTimer;

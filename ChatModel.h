@@ -50,12 +50,19 @@ public:
     QString currentChatFilePath() const { return m_currentChatFilePath; }
     void setCurrentChatFilePath(const QString &path);
 
-    Q_PROPERTY(int totalTokens READ totalTokens NOTIFY totalTokensChanged)
-    int totalTokens() const { return m_totalTokens; }
+    // Représente la taille du contexte actuel pour la curation
+    Q_PROPERTY(int liveMemoryTokens READ liveMemoryTokens NOTIFY liveMemoryTokensChanged)
+    // Représente le coût cumulatif total pour l'utilisateur
+    Q_PROPERTY(int cumulativeTokenCost READ cumulativeTokenCost NOTIFY cumulativeTokenCostChanged)
+
+    int liveMemoryTokens() const { return m_liveMemoryTokens; }
+    int cumulativeTokenCost() const { return m_cumulativeTokenCost; }
+    Q_INVOKABLE void resetTokenCost(); // méthode pour le bouton "Reset"
 
 signals:
     void currentChatFilePathChanged();
-    void totalTokensChanged();
+    void liveMemoryTokensChanged();
+    void cumulativeTokenCostChanged();
     void chatMessageAdded(const ChatMessage &message);
     void chatError(const QString &error);
     void curationNeeded(); // Signal pour indiquer qu'une curation est nécessaire
@@ -67,14 +74,15 @@ private slots:
 
 private:
     void addMessage(const ChatMessage &message); // Ajoute un message au modèle et au fichier
-    void updateTokenCount();
+    void updateLiveMemoryEstimate();
     void checkCurationThreshold();
     void triggerCuration(); // Placeholder pour la logique de curation
 
     QList<ChatMessage> m_messages;
     Interlocutor *m_interlocutor; // L'interlocuteur réel ou bidon
     QString m_currentChatFilePath;
-    int m_totalTokens;
+    int m_liveMemoryTokens = 0;
+    int m_cumulativeTokenCost = 0;
 
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
     const int BASE_LIVE_MEMORY_TOKENS = 10000 ;/* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 100000;

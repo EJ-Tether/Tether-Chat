@@ -1,3 +1,4 @@
+// Begin source file ChatManager.cpp
 #include "ChatManager.h"
 #include <QStandardPaths>
 #include <QDir>
@@ -192,3 +193,4 @@ Interlocutor* ChatManager::createInterlocutorFromConfig(InterlocutorConfig* conf
     qWarning() << "Unknown interlocutor type:" << config->type() << ". Creating a Dummy as fallback.";
     return new DummyInterlocutor(config->name(), this);
 }
+// End source file ChatManager.cpp

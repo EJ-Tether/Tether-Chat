@@ -1,3 +1,5 @@
+// Begin source file OpenAIInterlocutor.h
+#pragma once
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -38,3 +40,4 @@ class OpenAIInterlocutor : public Interlocutor {
   const int REQUEST_TIMEOUT_MS = 100000;
   QMap<QNetworkReply *, QTimer *> m_requestTimers;
 };
+// End source file OpenAIInterlocutor.h

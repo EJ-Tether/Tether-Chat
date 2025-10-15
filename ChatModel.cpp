@@ -8,9 +8,10 @@
 #include <QFileInfo>
 
 ChatModel::ChatModel(QObject *parent)
-    : QAbstractListModel(parent),
-    m_interlocutor(nullptr),
-    m_totalTokens(0)
+    : QAbstractListModel(parent)
+    , m_interlocutor(nullptr)
+    , m_liveMemoryTokens(0)
+    , m_cumulativeTokenCost(0)
 {
     if (m_interlocutor) {
         connect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
@@ -55,26 +56,28 @@ QHash<int, QByteArray> ChatModel::roleNames() const {
     return roles;
 }
 
-void ChatModel::sendMessage(const QString &messageText) {
+void ChatModel::sendMessage(const QString &messageText)
+{
     if (!m_interlocutor) {
         emit chatError("Interlocutor is not set.");
         return;
     }
 
     // 1. Ajouter le message de l'utilisateur au modèle
-    ChatMessage userMessage(true, messageText, QDateTime::currentDateTime(), messageText.length()/4, 0, "user");
+    // Note: les tokens de ce message seront déterminés par la réponse de l'API
+    ChatMessage userMessage(true,
+                            messageText,
+                            QDateTime::currentDateTime(),
+                            messageText.length() / 4,
+                            0,
+                            "user");
     addMessage(userMessage);
 
-    // TODO: Estimer les tokens du prompt pour le message utilisateur avant d'envoyer
-    // Pour l'instant, on laisse à 0 et on se base sur le retour de l'API pour les tokens réellement consommés.
-    // Ou on pourrait faire une estimation simple: userMessage.setPromptTokens(messageText.length() / 4);
-
-    // 2. Envoyer le message à l'interlocuteur
-    m_interlocutor->sendRequest(messageText);
+    // 2. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
+    m_interlocutor->sendRequest(m_messages);
 }
 
 void ChatModel::handleInterlocutorResponse(const QJsonObject &response) {
-    // --- NOUVELLE LOGIQUE DE TRI ---
     // On vérifie si cette réponse concerne la curation ou un chat normal.
     if (m_isWaitingForCurationResponse) {
         qDebug() << "Curation response received.";
@@ -107,6 +110,7 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response) {
     QString aiResponseText;
     int promptTokens = 0;
     int completionTokens = 0;
+    int totalTokensForThisExchange = 0;
 
     if (response.contains("choices") && response["choices"].isArray()) {
         QJsonArray choicesArray = response["choices"].toArray();
@@ -121,47 +125,53 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response) {
         }
     }
 
-    // Extraire l'usage des tokens si disponible (simulé par DummyInterlocutor)
     if (response.contains("usage") && response["usage"].isObject()) {
         QJsonObject usage = response["usage"].toObject();
-        promptTokens = usage["prompt_tokens"].toInt(0); // Tokens de la requête totale
-        completionTokens = usage["completion_tokens"].toInt(0); // Tokens de la réponse
+        promptTokens = usage["prompt_tokens"].toInt(0);
+        completionTokens = usage["completion_tokens"].toInt(0);
+        totalTokensForThisExchange = usage["total_tokens"].toInt(0);
     }
 
-    // Mise à jour des tokens du dernier message UTILISATEUR (le prompt qui a généré la réponse)
-    // C'est un peu délicat car l'API retourne l'usage total du prompt, y compris le system message.
-    // Pour une gestion plus précise, il faudrait stocker le contexte envoyé à l'API.
-    // Pour le moment, on assigne ces tokens au dernier message utilisateur.
-    if (!m_messages.isEmpty()) {
-        ChatMessage &lastUserMessage = m_messages.last();
-        if (lastUserMessage.isLocalMessage()) { // Assurez-vous que c'est bien le message de l'utilisateur
-            lastUserMessage.setPromptTokens(promptTokens); // Tokens envoyés pour la requête
-            // On a changé le nombre de tokens émis, on doit le signaler au QML par un signal:
-            int lastIndex = m_messages.count() - 1;
-            QModelIndex modelIndex = index(lastIndex);
-            emit dataChanged(modelIndex, modelIndex, {PromptTokensRole});
-        }
+    // 1. Mettre à jour la taille de la Mémoire Vive pour la curation
+    // La nouvelle taille est simplement le `prompt_tokens` (qui inclut l'historique) + `completion_tokens`.
+    int newLiveMemorySize = promptTokens + completionTokens;
+    if (m_liveMemoryTokens != newLiveMemorySize) {
+        m_liveMemoryTokens = newLiveMemorySize;
+        emit liveMemoryTokensChanged();
+        qDebug() << "Live Memory size is now:" << m_liveMemoryTokens << "tokens.";
     }
 
+    // 2. Mettre à jour le coût cumulatif pour l'utilisateur
+    // On AJOUTE le coût de cet échange au total.
+    m_cumulativeTokenCost += totalTokensForThisExchange;
+    emit cumulativeTokenCostChanged();
+    qDebug() << "Cumulative token cost is now:" << m_cumulativeTokenCost;
 
-    // Ajouter le message de l'IA au modèle
-    ChatMessage aiMessage(false, aiResponseText, QDateTime::currentDateTime(), 0, completionTokens, "assistant");
-    addMessage(aiMessage); // Le promptTokens est 0 pour le message AI lui-même, completionTokens est la réponse
-    updateTokenCount();
+    // Ajouter le message de l'IA au modèle, en stockant les tokens de cet échange
+    ChatMessage aiMessage(false,
+                          aiResponseText,
+                          QDateTime::currentDateTime(),
+                          promptTokens,
+                          completionTokens,
+                          "assistant");
+    addMessage(aiMessage);
+
+    // La curation est basée sur la taille de la mémoire vive
     checkCurationThreshold();
 }
 
-void ChatModel::handleInterlocutorError(const QString &error) {
+void ChatModel::handleInterlocutorError(const QString &error)
+{
     qWarning() << "Interlocutor Error:" << error;
     emit chatError("Error from AI: " + error);
     // Optionnel: ajouter un message d'erreur visible dans le chat
     ChatMessage errorMessage(false, "ERROR: " + error, QDateTime::currentDateTime(), 0, 0, "system");
     addMessage(errorMessage);
-    updateTokenCount();
+    updateLiveMemoryEstimate();
 }
 
-
-void ChatModel::addMessage(const ChatMessage &message) {
+void ChatModel::addMessage(const ChatMessage &message)
+{
     beginInsertRows(QModelIndex(), m_messages.count(), m_messages.count());
     m_messages.append(message);
     endInsertRows();
@@ -177,11 +187,9 @@ void ChatModel::addMessage(const ChatMessage &message) {
             qWarning() << "Failed to open chat file for appending:" << m_currentChatFilePath;
         }
     }
-
     emit chatMessageAdded(message);
-    updateTokenCount(); // Met à jour le total des tokens après l'ajout
+    // On retire l'appel à updateTokenCount() d'ici.
 }
-
 
 void ChatModel::loadChat(const QString &filePath) {
     if (m_currentChatFilePath == filePath && !filePath.isEmpty()) {
@@ -194,14 +202,15 @@ void ChatModel::loadChat(const QString &filePath) {
 
     beginResetModel(); // Réinitialiser le modèle pour le chargement d'un nouveau chat
     m_messages.clear();
-    m_totalTokens = 0; // Réinitialiser le compteur de tokens
+    m_liveMemoryTokens = 0;    // Réinitialiser
+    m_cumulativeTokenCost = 0; // Réinitialiser
 
     if (filePath.isEmpty()) {
         qDebug() << "No file path provided to load chat. Starting with an empty chat.";
         m_currentChatFilePath = ""; // S'assurer que le chemin est vide
         endResetModel();
         emit currentChatFilePathChanged();
-        emit totalTokensChanged();
+        emit liveMemoryTokensChanged();
         return;
     }
 
@@ -217,7 +226,7 @@ void ChatModel::loadChat(const QString &filePath) {
         m_currentChatFilePath = filePath;
         endResetModel();
         emit currentChatFilePathChanged();
-        emit totalTokensChanged();
+        emit liveMemoryTokensChanged();
         return;
     }
 
@@ -228,19 +237,21 @@ void ChatModel::loadChat(const QString &filePath) {
         if (!doc.isNull() && doc.isObject()) {
             ChatMessage msg = ChatMessage::fromJsonObject(doc.object());
             m_messages.append(msg);
+            m_cumulativeTokenCost += msg.promptTokens() + msg.completionTokens();
         } else {
             qWarning() << "Skipping malformed JSON line in chat file:" << filePath;
         }
     }
     file.close();
-
+    updateLiveMemoryEstimate();
+    emit cumulativeTokenCostChanged();
     m_currentChatFilePath = filePath;
-    updateTokenCount(); // Recalculer après chargement
     endResetModel();
 
     emit currentChatFilePathChanged();
-    emit totalTokensChanged();
-    qDebug() << "Chat loaded from" << filePath << "with" << m_messages.count() << "messages and" << m_totalTokens << "tokens.";
+    emit liveMemoryTokensChanged();
+    qDebug() << "Chat loaded from" << filePath << "with" << m_messages.count() << "messages and"
+             << m_liveMemoryTokens << "tokens.";
     checkCurationThreshold();
 }
 
@@ -273,8 +284,8 @@ void ChatModel::clearChat() {
             }
         }
     }
-    m_totalTokens = 0;
-    emit totalTokensChanged();
+    m_liveMemoryTokens = 0;
+    emit liveMemoryTokensChanged();
     emit chatError("Chat cleared.");
 }
 
@@ -286,26 +297,35 @@ void ChatModel::setCurrentChatFilePath(const QString &path) {
     loadChat(path); // Recharge le chat avec le nouveau chemin
 }
 
-void ChatModel::updateTokenCount() {
-    int newTotalTokens = 0;
+void ChatModel::resetTokenCost()
+{
+    qDebug() << "Resetting cumulative token cost.";
+    m_cumulativeTokenCost = 0;
+    emit cumulativeTokenCostChanged();
+}
+void ChatModel::updateLiveMemoryEstimate()
+{
+    // Cette fonction est maintenant une estimation pour l'état initial.
+    // La vraie valeur sera corrigée au premier appel API.
+    int estimatedTokens = 15; // System prompt
     for (const auto &msg : m_messages) {
-        newTotalTokens += msg.promptTokens();
-        newTotalTokens += msg.completionTokens();
-        // Une estimation simple si les tokens ne sont pas encore définis:
-        // newTotalTokens += msg.text().length() / 4; // Environ 4 caractères par token
+        estimatedTokens += msg.text().length() / 4;
     }
-    if (m_totalTokens != newTotalTokens) {
-        m_totalTokens = newTotalTokens;
-        emit totalTokensChanged();
-        qDebug() << "Current total tokens:" << m_totalTokens;
+
+    if (m_liveMemoryTokens != estimatedTokens) {
+        m_liveMemoryTokens = estimatedTokens;
+        emit liveMemoryTokensChanged();
+        qDebug() << "Estimated Live Memory on load:" << m_liveMemoryTokens << "tokens.";
     }
 }
 
-void ChatModel::checkCurationThreshold() {
-    if (m_totalTokens >= CURATION_TRIGGER_TOKENS) {
-        qDebug() << "Curation threshold reached! Total tokens:" << m_totalTokens;
-        emit curationNeeded(); // Signale que la curation doit être lancée
-        triggerCuration(); // Appel du placeholder de la curation
+void ChatModel::checkCurationThreshold()
+{
+    // On utilise maintenant la bonne variable
+    if (m_liveMemoryTokens >= CURATION_TRIGGER_TOKENS && !m_isCurationInProgress) {
+        qDebug() << "Curation threshold reached! Live memory size:" << m_liveMemoryTokens;
+        emit curationNeeded();
+        triggerCuration();
     }
 }
 
@@ -358,7 +378,7 @@ void ChatModel::triggerCuration() {
     int numMessagesToRemove = 0;
 
     // On retire les messages jusqu'à redescendre sous le seuil de base
-    while (m_totalTokens > BASE_LIVE_MEMORY_TOKENS && !m_messages.isEmpty()) {
+    while (m_liveMemoryTokens > BASE_LIVE_MEMORY_TOKENS && !m_messages.isEmpty()) {
         ChatMessage msg = m_messages.first();
         messagesToCurate.append(msg);
 
@@ -366,7 +386,7 @@ void ChatModel::triggerCuration() {
         // Estimation si les tokens sont à 0
         if (msgTokens == 0) msgTokens = msg.text().length() / 4;
 
-        m_totalTokens -= msgTokens;
+        m_liveMemoryTokens -= msgTokens;
         m_messages.removeFirst();
         numMessagesToRemove++;
     }
@@ -376,7 +396,7 @@ void ChatModel::triggerCuration() {
         beginRemoveRows(QModelIndex(), 0, numMessagesToRemove - 1);
         endRemoveRows();
         rewriteChatFile(); // On met à jour le fichier de la mémoire vive
-        emit totalTokensChanged(); // On notifie l'UI du nouveau total de tokens
+        emit liveMemoryTokensChanged(); // On notifie l'UI du nouveau total de tokens
     } else {
         qWarning() << "Curation triggered, but no messages to cull. Aborting.";
         m_isCurationInProgress = false;
@@ -406,7 +426,16 @@ void ChatModel::triggerCuration() {
     // --- Phase 3: Appel asynchrone à l'IA ---
     qDebug() << "Sending request for curation summary...";
     m_isWaitingForCurationResponse = true;
-    m_interlocutor->sendRequest(curationPrompt);
+    // On crée une liste temporaire pour notre requête de curation
+    QList<ChatMessage> curationRequestHistory;
+
+    // On y place notre prompt de curation comme un unique message de l'utilisateur
+    // Les autres champs (timestamp, tokens) n'ont pas d'importance ici.
+    curationRequestHistory.append(
+        ChatMessage(true, curationPrompt, QDateTime::currentDateTime(), 0, 0, "user"));
+
+    // On appelle la méthode sendRequest avec la signature correcte
+    m_interlocutor->sendRequest(curationRequestHistory);
 }
 
 // --- Implémentation des nouvelles fonctions utilitaires ---

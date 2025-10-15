@@ -1,3 +1,4 @@
+// Begin source file InterlocutorConfig.cpp
 #include "InterlocutorConfig.h"
 
 InterlocutorConfig::InterlocutorConfig(QObject *parent) : QObject(parent) {}

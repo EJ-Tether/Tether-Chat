@@ -10,55 +10,70 @@ DummyInterlocutor::DummyInterlocutor(QString interlocutorName, QObject *parent)
     m_responseTimer->setSingleShot(true);
 }
 
-void DummyInterlocutor::sendRequest(const QString &prompt)
+void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history)
 {
-    qDebug() << "DummyInterlocutor received prompt:" << prompt;
+    if (history.isEmpty())
+        return;
+
+    const QString &lastPrompt = history.last().text();
+    qDebug() << "DummyInterlocutor received history with last prompt:" << lastPrompt;
+
     m_responseTimer->setInterval(500);
 
-    QObject::connect(m_responseTimer, &QTimer::timeout, this, [this, prompt]() {
-        // --- LOGIQUE DE SIMULATION DE RÉPONSE ---
-        QString reversedPrompt = prompt;
-        std::reverse(reversedPrompt.begin(), reversedPrompt.end());
-        QString completionText = "Réponse bidon: " + reversedPrompt;
+    QObject::connect(
+        m_responseTimer,
+        &QTimer::timeout,
+        this,
+        [this, history]() {
+            const QString &lastPrompt = history.last().text();
+            QString reversedPrompt = lastPrompt;
+            std::reverse(reversedPrompt.begin(), reversedPrompt.end());
+            QString completionText = "Réponse bidon: " + reversedPrompt;
 
-        // --- DÉBUT DE LA SIMULATION DU DÉCOMPTE DE TOKENS ---
-        // On utilise la règle simple : 1 token pour 4 caractères.
-        // La division entière s'occupe de l'arrondi.
-        int promptTokens = prompt.length() / 4;
-        int completionTokens = completionText.length() / 4;
+            // --- NOUVELLE SIMULATION BASÉE SUR L'HISTORIQUE ---
+            int systemTokens = 15; // Simule un prompt système constant
+            int historyTokens = 0;
+            for (const auto &msg : history) {
+                historyTokens += msg.text().length() / 4;
+            }
+            int completionTokens = completionText.length() / 4;
 
-        // On crée l'objet "usage" que le ChatModel s'attend à recevoir.
-        QJsonObject usageObject;
-        usageObject["prompt_tokens"] = promptTokens;
-        usageObject["completion_tokens"] = completionTokens;
+            int totalPromptTokens = systemTokens + historyTokens;
+            int totalTokens = totalPromptTokens + completionTokens;
 
-        qDebug() << "Dummy simulation: prompt_tokens =" << promptTokens << ", completion_tokens =" << completionTokens;
-        // --- FIN DE LA SIMULATION DU DÉCOMPTE DE TOKENS ---
+            QJsonObject usageObject;
+            usageObject["prompt_tokens"] = totalPromptTokens;
+            usageObject["completion_tokens"] = completionTokens;
+            usageObject["total_tokens"] = totalTokens;
 
-        // --- CONSTRUCTION DE LA RÉPONSE JSON COMPLÈTE ---
-        QJsonObject message;
-        message["role"] = "assistant";
-        message["content"] = completionText;
+            qDebug() << "Dummy usage based on history: total_tokens =" << totalTokens;
+            // --- FIN DE LA SIMULATION DU DÉCOMPTE DE TOKENS ---
 
-        QJsonObject firstChoice;
-        firstChoice["message"] = message;
+            // --- CONSTRUCTION DE LA RÉPONSE JSON COMPLÈTE ---
+            QJsonObject message;
+            message["role"] = "assistant";
+            message["content"] = completionText;
 
-        QJsonArray choicesArray;
-        choicesArray.append(firstChoice);
+            QJsonObject firstChoice;
+            firstChoice["message"] = message;
 
-        QJsonObject responseObj;
-        responseObj["choices"] = choicesArray;
-        responseObj["id"] = "dummy-chatcmpl-12345";
-        responseObj["object"] = "chat.completion";
-        responseObj["created"] = QDateTime::currentSecsSinceEpoch();
-        responseObj["model"] = "dummy-model";
+            QJsonArray choicesArray;
+            choicesArray.append(firstChoice);
 
-        // On insère notre objet "usage" simulé dans la réponse finale.
-        responseObj["usage"] = usageObject;
+            QJsonObject responseObj;
+            responseObj["choices"] = choicesArray;
+            responseObj["id"] = "dummy-chatcmpl-12345";
+            responseObj["object"] = "chat.completion";
+            responseObj["created"] = QDateTime::currentSecsSinceEpoch();
+            responseObj["model"] = "dummy-model";
 
-        // On émet la réponse pour que le ChatModel puisse la traiter.
-        emit responseReceived(responseObj);
-    }, Qt::SingleShotConnection);
+            // On insère notre objet "usage" simulé dans la réponse finale.
+            responseObj["usage"] = usageObject;
+
+            // On émet la réponse pour que le ChatModel puisse la traiter.
+            emit responseReceived(responseObj);
+        },
+        Qt::SingleShotConnection);
 
     m_responseTimer->start();
 }
