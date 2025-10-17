@@ -1,9 +1,11 @@
 // Begin source file ChatManager.cpp
 #include "ChatManager.h"
-#include <QStandardPaths>
-#include <QDir>
 #include <QDebug>
+#include <QDir>
+#include <QStandardPaths>
 #include "DummyInterlocutor.h"
+#include "GoogleAIInterlocutor.h"
+#include "OpenAIInterlocutor.h"
 
 ChatManager::ChatManager(QObject *parent)
     : QObject(parent), m_chatModel(new ChatModel(this))
@@ -178,19 +180,33 @@ void ChatManager::saveInterlocutorsToDisk() {
     file.write(QJsonDocument(configArray).toJson(QJsonDocument::Indented));
 }
 
-Interlocutor* ChatManager::createInterlocutorFromConfig(InterlocutorConfig* config) {
-    // C'est une "factory" qui crée le bon type d'objet en fonction de la config
+Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *config)
+{
+    if (config->type() == "OpenAI") {
+        // NOTE: Le modèle ("gpt-4o", etc.) devrait aussi être dans la config !
+        // Pour l'instant, on le met en dur.
+        return new OpenAIInterlocutor(config->name(),
+                                      config->apiKey(),
+                                      QUrl(config->endpointUrl()),
+                                      "gpt-4o", // A AJOUTER DANS InterlocutorConfig plus tard
+                                      this);
+    }
+
+    if (config->type() == "Google") {
+        // L'URL de Google inclut le nom du modèle.
+        // ex: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
+        return new GoogleAIInterlocutor(config->name(),
+                                        config->apiKey(),
+                                        QUrl(config->endpointUrl()),
+                                        this);
+    }
+
     if (config->type() == "Dummy") {
         return new DummyInterlocutor(config->name(), this);
     }
-    // else if (config->type() == "OpenAI") {
-    //     auto openAI = new OpenAIInterlocutor(config->name(), this);
-    //     openAI->setApiKey(config->apiKey());
-    //     // ... etc ...
-    //     return openAI;
-    // }
 
-    qWarning() << "Unknown interlocutor type:" << config->type() << ". Creating a Dummy as fallback.";
+    qWarning() << "Unknown interlocutor type:" << config->type()
+               << ". Creating a Dummy as fallback.";
     return new DummyInterlocutor(config->name(), this);
 }
 // End source file ChatManager.cpp

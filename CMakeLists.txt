@@ -26,6 +26,7 @@ qt_add_qml_module(appTether
         SOURCES ChatManager.cpp ChatManager.h
         SOURCES InterlocutorConfig.cpp InterlocutorConfig.h
         SOURCES Interlocutor.h
+        SOURCES GoogleAIInterlocutor.h GoogleAIInterlocutor.cpp
 
 )
 
