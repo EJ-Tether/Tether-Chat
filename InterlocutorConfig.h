@@ -13,6 +13,9 @@ class InterlocutorConfig : public QObject
     Q_PROPERTY(QString apiKey READ apiKey WRITE setApiKey NOTIFY apiKeyChanged)
     Q_PROPERTY(QString endpointUrl READ endpointUrl WRITE setEndpointUrl NOTIFY endpointUrlChanged)
     Q_PROPERTY(QString systemPrompt READ systemPrompt WRITE setSystemPrompt NOTIFY systemPromptChanged)
+    Q_PROPERTY(QString modelName READ modelName WRITE setModelName NOTIFY modelNameChanged)
+    Q_PROPERTY(QString ancientMemoryFileId READ ancientMemoryFileId WRITE setAncientMemoryFileId
+                   NOTIFY ancientMemoryFileIdChanged)
 
 public:
     explicit InterlocutorConfig(QObject *parent = nullptr);
@@ -35,6 +38,12 @@ public:
     // Fonctions pour la persistance JSON
     void read(const QJsonObject &json);
     void write(QJsonObject &json) const;
+    
+    QString modelName() const;
+    void setModelName(const QString &modelName);
+
+    QString ancientMemoryFileId() const;
+    void setAncientMemoryFileId(const QString &fileId);
 
 signals:
     void nameChanged();
@@ -42,6 +51,8 @@ signals:
     void apiKeyChanged();
     void endpointUrlChanged();
     void systemPromptChanged();
+    void modelNameChanged();
+    void ancientMemoryFileIdChanged();
 
 private:
     QString m_name;
@@ -49,6 +60,8 @@ private:
     QString m_apiKey;
     QString m_endpointUrl;
     QString m_systemPrompt;
+    QString m_modelName;
+    QString m_ancientMemoryFileId;
 };
 
 #endif // INTERLOCUTORCONFIG_H

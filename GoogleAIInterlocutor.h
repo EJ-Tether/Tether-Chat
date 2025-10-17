@@ -16,7 +16,8 @@ public:
                                   const QUrl &url,
                                   QObject *parent = nullptr);
 
-    Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history) override;
+    Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
+                                 const QStringList &attachmentFileIds) override;
     void setSystemPrompt(const QString &systemPrompt) override;
 
 private:

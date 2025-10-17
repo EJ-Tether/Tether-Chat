@@ -10,7 +10,8 @@ DummyInterlocutor::DummyInterlocutor(QString interlocutorName, QObject *parent)
     m_responseTimer->setSingleShot(true);
 }
 
-void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history)
+void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history,
+                                    const QStringList &attachmentFileIds)
 {
     if (history.isEmpty())
         return;

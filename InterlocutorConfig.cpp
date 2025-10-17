@@ -43,6 +43,30 @@ void InterlocutorConfig::setSystemPrompt(const QString &systemPrompt) {
     }
 }
 
+QString InterlocutorConfig::modelName() const
+{
+    return m_modelName;
+}
+void InterlocutorConfig::setModelName(const QString &modelName)
+{
+    if (m_modelName != modelName) {
+        m_modelName = modelName;
+        emit modelNameChanged();
+    }
+}
+
+QString InterlocutorConfig::ancientMemoryFileId() const
+{
+    return m_ancientMemoryFileId;
+}
+void InterlocutorConfig::setAncientMemoryFileId(const QString &ancientMemoryFileId)
+{
+    if (m_ancientMemoryFileId != ancientMemoryFileId) {
+        m_ancientMemoryFileId = ancientMemoryFileId;
+        emit ancientMemoryFileIdChanged();
+    }
+}
+
 void InterlocutorConfig::read(const QJsonObject &json) {
     setName(json["name"].toString());
     setType(json["type"].toString());

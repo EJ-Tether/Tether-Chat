@@ -24,7 +24,8 @@ void GoogleAIInterlocutor::setSystemPrompt(const QString &systemPrompt)
     m_systemPrompt = systemPrompt;
 }
 
-void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history)
+void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
+                                       const QStringList &attachmentFileIds)
 {
     // L'URL de Gemini a besoin de la clé API en paramètre
     QUrl requestUrl(m_url);

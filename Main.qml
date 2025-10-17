@@ -27,21 +27,21 @@ ApplicationWindow {
             messageInput.text = "";
         }
     }
-    // Connecter aux signaux de chatModel pour la gestion des erreurs et le défilement
-    Connections {
-        target: currentChatModel
-        function onChatMessageAdded(message) {
-            _messageListView.positionViewAtEnd();
-        }
-        function onChatError(error) {
-            console.error("Chat Error:", error);
-            // Afficher l'erreur à l'utilisateur, par exemple dans une petite bulle ou une toast
-        }
-        function onTotalTokensChanged() {
-            console.log("Total tokens:", chatModel.totalTokens);
-            // TODO: Mettre à jour un QLabel pour afficher le nombre de tokens
-        }
-    }
+    //// Connecter aux signaux de chatModel pour la gestion des erreurs et le défilement
+    //Connections {
+    //    target: currentChatModel
+    //    function onChatMessageAdded(message) {
+    //        _messageListView.positionViewAtEnd();
+    //    }
+    //    function onChatError(error) {
+    //        console.error("Chat Error:", error);
+    //        // Afficher l'erreur à l'utilisateur, par exemple dans une petite bulle ou une toast
+    //    }
+    //    function onTotalTokensChanged() {
+    //        console.log("Total tokens:", chatModel.totalTokens);
+    //        // TODO: Mettre à jour un QLabel pour afficher le nombre de tokens
+    //    }
+    //}
 
 
     // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner
@@ -83,7 +83,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
             }
             Label {
-                text: "Session cost: " + _chatManager.chatModel.cumulativeTokenCost + " tokens"
+                text: "Session cost: " + _chatManager.chatModel ? (_chatManager.chatModel.cumulativeTokenCost + " tokens"): ""
             }
             Button {
                 id: _displayLicence
@@ -366,14 +366,50 @@ ApplicationWindow {
                                 onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.name = text
                             }
 
-                            // Le type
-                            Label { text: "Type:" }
+                            Label { text: "Provider:" }
                             ComboBox {
-                                id: typeComboBox
+                                id: providerComboBox
                                 Layout.fillWidth: true
-                                model: _chatManager.availableInterlocutorTypes
-                                currentIndex: _chatManager.currentConfig ? model.indexOf(_chatManager.currentConfig.type) : -1
-                                onActivated: if (_chatManager.currentConfig) _chatManager.currentConfig.type = model[index]
+                                model: _chatManager.availableProviders
+
+                                // Quand on sélectionne un fournisseur, on met à jour le modèle de la ComboBox des modèles
+                                onActivated: (index) => {
+                                    if (!_chatManager.currentConfig) return;
+                                    _chatManager.currentConfig.type = model[index];
+                                    // On demande au C++ la liste des modèles pour ce fournisseur
+                                    modelComboBox.model = _chatManager.modelsForProvider(model[index]);
+                                }
+
+                                // Initialisation
+                                Component.onCompleted: {
+                                    if (_chatManager.currentConfig) {
+                                        currentIndex = model.indexOf(_chatManager.currentConfig.type);
+                                        // On charge aussi la liste de modèles initiale
+                                        modelComboBox.model = _chatManager.modelsForProvider(_chatManager.currentConfig.type);
+                                    }
+                                }
+                            }
+
+                            // Nouvelle ComboBox pour le Modèle
+                            Label { text: "Model:" }
+                            ComboBox {
+                                id: modelComboBox
+                                Layout.fillWidth: true
+                                // Le modèle est rempli dynamiquement par la ComboBox du dessus
+
+                                // Quand on sélectionne un modèle, on met à jour toute la config
+                                onActivated: (index) => {
+                                    if (!_chatManager.currentConfig) return;
+                                    // On dit au C++ quel modèle a été choisi
+                                    _chatManager.updateConfigWithModel(model[index]);
+                                }
+
+                                // Initialisation
+                                Component.onCompleted: {
+                                    if (_chatManager.currentConfig) {
+                                        currentIndex = model.indexOf(_chatManager.currentConfig.modelName)
+                                    }
+                                }
                             }
 
                             // Clé API
@@ -393,8 +429,8 @@ ApplicationWindow {
                                 id: endpointUrlField
                                 Layout.fillWidth: true
                                 text: _chatManager.currentConfig ? _chatManager.currentConfig.endpointUrl : ""
-                                placeholderText: "https://api.openai.com/v1/chat/completions"
-                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.endpointUrl = text
+                                readOnly: true // L'utilisateur n'a plus à s'en soucier !
+                                placeholderText: "Auto-filled based on model selection"
                             }
 
                             // Instructions Personnalisées (System Prompt)

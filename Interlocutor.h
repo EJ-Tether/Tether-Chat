@@ -16,12 +16,19 @@ public:
     {}
     virtual ~Interlocutor() {}
 
-    Q_INVOKABLE virtual void sendRequest(const QList<ChatMessage> &history) = 0;
+    Q_INVOKABLE virtual void sendRequest(const QList<ChatMessage> &history,
+                                         const QStringList &attachmentFileIds = {})
+        = 0;
+    virtual void uploadFile(const QByteArray &content, const QString &purpose) = 0;
+    virtual void deleteFile(const QString &fileId) = 0;
     virtual void setSystemPrompt(const QString &systemPrompt) {}
 
 signals:
     void responseReceived(const QJsonObject &response);
     void errorOccurred(const QString &error);
+    void fileUploaded(const QString &fileId, const QString &purpose);
+    void fileDeleted(const QString &fileId, bool success);
+    void fileUploadFailed(const QString &error);
 
 private:
     // m_interlocutorName: That's the name that the user entered in the 'configuration' tab.
@@ -32,4 +39,4 @@ private:
 };
 
 #endif // INTERLOCUTOR_H
-       // End source file Interlocutor.h
+// End source file Interlocutor.h

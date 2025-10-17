@@ -5,13 +5,16 @@
 #include <QStandardPaths>
 #include "DummyInterlocutor.h"
 #include "GoogleAIInterlocutor.h"
+#include "ModelInfo.h"
 #include "OpenAIInterlocutor.h"
 
 ChatManager::ChatManager(QObject *parent)
-    : QObject(parent), m_chatModel(new ChatModel(this))
+    : QObject(parent)
+    , m_chatModel(new ChatModel(this))
 {
     // Définir le chemin de stockage des chats
-    m_chatFilesPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/TetherChats";
+    m_chatFilesPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                      + "/TetherChats";
     QDir dir(m_chatFilesPath);
     if (!dir.exists()) {
         dir.mkpath(".");
@@ -34,11 +37,13 @@ ChatManager::ChatManager(QObject *parent)
     }
 }
 
-ChatManager::~ChatManager() {
+ChatManager::~ChatManager()
+{
     // Le QObject parent s'occupe de détruire les enfants (m_chatModel, m_interlocutors)
 }
 
-void ChatManager::loadInterlocutors() {
+void ChatManager::loadInterlocutors()
+{
     // Pour l'instant, on charge juste le Dummy en dur.
     // Plus tard, on chargera tous les Interlocutor connus depuis l'objet Settings (qui reflète l'onglet Configuration)
     auto dummy = new DummyInterlocutor("Dummy", this);
@@ -52,18 +57,20 @@ void ChatManager::loadInterlocutors() {
     emit interlocutorNamesChanged();
 }
 
-QStringList ChatManager::interlocutorNames() const {
+QStringList ChatManager::interlocutorNames() const
+{
     return m_interlocutors.keys();
 }
 
-void ChatManager::switchToInterlocutor(const QString &name) {
+void ChatManager::switchToInterlocutor(const QString &name)
+{
     if (!m_interlocutors.contains(name) || m_activeInterlocutorName == name) {
         return; // Inconnu ou déjà actif
     }
 
     qDebug() << "Switching to interlocutor:" << name;
 
-    Interlocutor* interlocutor = m_interlocutors.value(name);
+    Interlocutor *interlocutor = m_interlocutors.value(name);
     m_chatModel->setInterlocutor(interlocutor);
 
     // Charger le fichier de chat correspondant
@@ -74,17 +81,19 @@ void ChatManager::switchToInterlocutor(const QString &name) {
     emit activeInterlocutorNameChanged();
 }
 
-
-InterlocutorConfig* ChatManager::currentConfig() const {
+InterlocutorConfig *ChatManager::currentConfig() const
+{
     return m_currentConfig;
 }
 
-QStringList ChatManager::availableInterlocutorTypes() const {
+QStringList ChatManager::availableInterlocutorTypes() const
+{
     // Plus tard, cette liste pourrait être plus dynamique
     return {"Dummy", "OpenAI", "Anthropic", "Gemini"};
 }
 
-void ChatManager::selectConfigToEdit(const QString &name) {
+void ChatManager::selectConfigToEdit(const QString &name)
+{
     for (auto config : m_allConfigs) {
         if (config->name() == name) {
             m_currentConfig = config;
@@ -94,22 +103,24 @@ void ChatManager::selectConfigToEdit(const QString &name) {
     }
 }
 
-void ChatManager::createNewConfig() {
+void ChatManager::createNewConfig()
+{
     // On crée un nouvel objet de config vide
     m_currentConfig = new InterlocutorConfig(this);
     emit currentConfigChanged();
 }
 
-bool ChatManager::saveConfig(InterlocutorConfig *config) {
+bool ChatManager::saveConfig(InterlocutorConfig *config)
+{
     if (!config || config->name().isEmpty()) {
         qWarning() << "Cannot save config with an empty name.";
         return false;
     }
 
     // Vérifier si une config avec ce nom existe déjà
-    InterlocutorConfig* existingConfig = nullptr;
-    for(auto c : m_allConfigs) {
-        if(c->name() == config->name()) {
+    InterlocutorConfig *existingConfig = nullptr;
+    for (auto c : m_allConfigs) {
+        if (c->name() == config->name()) {
             existingConfig = c;
             break;
         }
@@ -127,7 +138,7 @@ bool ChatManager::saveConfig(InterlocutorConfig *config) {
     if (m_interlocutors.contains(config->name())) {
         delete m_interlocutors.take(config->name());
     }
-    Interlocutor* newInterlocutor = createInterlocutorFromConfig(config);
+    Interlocutor *newInterlocutor = createInterlocutorFromConfig(config);
     m_interlocutors.insert(config->name(), newInterlocutor);
 
     saveInterlocutorsToDisk();
@@ -135,13 +146,14 @@ bool ChatManager::saveConfig(InterlocutorConfig *config) {
     return true;
 }
 
-void ChatManager::deleteConfig(const QString &name) {
+void ChatManager::deleteConfig(const QString &name)
+{
     // ... (logique pour supprimer la config de m_allConfigs et l'interlocuteur de m_interlocutors)
     // ... (puis sauvegarder et émettre les signaux de changement)
 }
 
-
-void ChatManager::loadInterlocutorsFromDisk() {
+void ChatManager::loadInterlocutorsFromDisk()
+{
     QFile file(m_chatFilesPath + "/interlocutors.json");
     if (!file.open(QIODevice::ReadOnly)) {
         qWarning("Couldn't open interlocutors.json");
@@ -153,18 +165,19 @@ void ChatManager::loadInterlocutorsFromDisk() {
 
     for (const QJsonValue &value : configArray) {
         QJsonObject obj = value.toObject();
-        InterlocutorConfig* config = new InterlocutorConfig(this);
+        InterlocutorConfig *config = new InterlocutorConfig(this);
         config->read(obj);
         m_allConfigs.append(config);
 
-        Interlocutor* interlocutor = createInterlocutorFromConfig(config);
+        Interlocutor *interlocutor = createInterlocutorFromConfig(config);
         m_interlocutors.insert(config->name(), interlocutor);
     }
 
     emit interlocutorNamesChanged();
 }
 
-void ChatManager::saveInterlocutorsToDisk() {
+void ChatManager::saveInterlocutorsToDisk()
+{
     QJsonArray configArray;
     for (const auto config : m_allConfigs) {
         QJsonObject obj;
@@ -179,28 +192,50 @@ void ChatManager::saveInterlocutorsToDisk() {
     }
     file.write(QJsonDocument(configArray).toJson(QJsonDocument::Indented));
 }
+QStringList ChatManager::availableProviders() const
+{
+    return m_modelRegistry.availableProviders();
+}
+
+QStringList ChatManager::modelsForProvider(const QString &provider)
+{
+    return m_modelRegistry.modelsForProvider(provider);
+}
+
+void ChatManager::updateConfigWithModel(const QString &modelDisplayName)
+{
+    if (!m_currentConfig)
+        return;
+
+    ModelInfo model = m_modelRegistry.findModel(modelDisplayName);
+    if (!model.displayName.isEmpty()) {
+        m_currentConfig->setModelName(model.displayName);
+
+        // Mettre à jour l'URL en remplaçant le placeholder
+        QString endpoint = model.endpointTemplate;
+        endpoint.replace("%MODEL_NAME%", model.internalName);
+        m_currentConfig->setEndpointUrl(endpoint);
+    }
+}
 
 Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *config)
 {
-    if (config->type() == "OpenAI") {
-        // NOTE: Le modèle ("gpt-4o", etc.) devrait aussi être dans la config !
-        // Pour l'instant, on le met en dur.
+    ModelInfo model = m_modelRegistry.findModel(config->modelName());
+
+    // On utilise maintenant model.provider au lieu de config->type()
+    if (model.provider == "OpenAI") {
         return new OpenAIInterlocutor(config->name(),
                                       config->apiKey(),
                                       QUrl(config->endpointUrl()),
-                                      "gpt-4o", // A AJOUTER DANS InterlocutorConfig plus tard
+                                      model.internalName, // On passe le nom interne !
                                       this);
     }
-
-    if (config->type() == "Google") {
-        // L'URL de Google inclut le nom du modèle.
-        // ex: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
+    if (model.provider == "Google") {
         return new GoogleAIInterlocutor(config->name(),
                                         config->apiKey(),
                                         QUrl(config->endpointUrl()),
                                         this);
     }
-
     if (config->type() == "Dummy") {
         return new DummyInterlocutor(config->name(), this);
     }

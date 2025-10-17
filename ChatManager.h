@@ -9,6 +9,7 @@
 #include "Interlocutor.h"
 //#include "DummyInterlocutor.h" // Pour le debug
 #include "InterlocutorConfig.h"
+#include "ModelRegistry.h"
 
 class ChatManager : public QObject
 {
@@ -31,8 +32,8 @@ public:
     // Propriété pour la configuration en cours d'édition dans l'onglet "Configure"
     Q_PROPERTY(InterlocutorConfig* currentConfig READ currentConfig NOTIFY currentConfigChanged)
 
-    // Propriété pour la liste des types d'interlocuteurs disponibles (pour le ComboBox)
-    Q_PROPERTY(QStringList availableInterlocutorTypes READ availableInterlocutorTypes CONSTANT)
+    // Propriété pour la liste des Providers disponibles (pour le ComboBox)
+    Q_PROPERTY(QStringList availableProviders READ availableProviders CONSTANT)
 
     // Méthode Q_INVOKABLE pour changer l'interlocuteur depuis QML
     Q_INVOKABLE void switchToInterlocutor(const QString &name);
@@ -50,6 +51,11 @@ public:
     QStringList interlocutorNames() const;
     QString activeInterlocutorName() const { return m_activeInterlocutorName; }
 
+    Q_INVOKABLE QStringList modelsForProvider(const QString &provider);
+    Q_INVOKABLE void updateConfigWithModel(const QString &modelDisplayName);
+
+    QStringList availableProviders() const;
+    InterlocutorConfig *findCurrentConfig() { return m_currentConfig; }
 
 signals:
     void interlocutorNamesChanged();
@@ -71,6 +77,7 @@ private:
     Interlocutor* createInterlocutorFromConfig(InterlocutorConfig* config);
     InterlocutorConfig* m_currentConfig = nullptr; // Pointeur vers la config en cours d'édition
     QList<InterlocutorConfig*> m_allConfigs; // La liste de toutes les configurations
+    ModelRegistry m_modelRegistry;
 };
 
 #endif // CHATMANAGER_H

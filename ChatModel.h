@@ -71,12 +71,17 @@ signals:
 private slots:
     void handleInterlocutorResponse(const QJsonObject &response);
     void handleInterlocutorError(const QString &error);
+    void onLiveMemoryUploadedForCuration(const QString &fileId, const QString &purpose);
+    void onNewAncientMemoryUploaded(const QString &newFileId, const QString &purpose);
+    void onOldAncientMemoryDeleted(const QString &fileId, bool success);
+    void onCurationUploadFailed(const QString &error);
 
 private:
     void addMessage(const ChatMessage &message); // Ajoute un message au modèle et au fichier
     void updateLiveMemoryEstimate();
     void checkCurationThreshold();
     void triggerCuration(); // Placeholder pour la logique de curation
+    InterlocutorConfig *findCurrentConfig();
 
     QList<ChatMessage> m_messages;
     Interlocutor *m_interlocutor; // L'interlocuteur réel ou bidon
@@ -97,6 +102,8 @@ private:
     // Flags pour gérer le processus de curation asynchrone
     bool m_isCurationInProgress = false;
     bool m_isWaitingForCurationResponse = false;
+    QString m_liveMemoryFileIdForCuration;
+    QString m_oldAncientMemoryFileIdToDelete;
 };
 
 #endif // CHATMODEL_H

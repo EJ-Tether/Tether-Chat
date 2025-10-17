@@ -1,11 +1,12 @@
 // Begin Source File : ChatModel.cpp
 #include "ChatModel.h"
 #include <QDebug>
+#include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QStandardPaths>
-#include <QFileInfo>
+#include "InterlocutorConfig.h"
 
 ChatModel::ChatModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -14,38 +15,54 @@ ChatModel::ChatModel(QObject *parent)
     , m_cumulativeTokenCost(0)
 {
     if (m_interlocutor) {
-        connect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
-        connect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
+        connect(m_interlocutor,
+                &Interlocutor::responseReceived,
+                this,
+                &ChatModel::handleInterlocutorResponse);
+        connect(m_interlocutor,
+                &Interlocutor::errorOccurred,
+                this,
+                &ChatModel::handleInterlocutorError);
     }
 }
 
-ChatModel::~ChatModel() {
+ChatModel::~ChatModel()
+{
     saveChat(); // Sauvegarder la conversation à la fermeture si nécessaire
 }
 
-int ChatModel::rowCount(const QModelIndex &parent) const {
+int ChatModel::rowCount(const QModelIndex &parent) const
+{
     if (parent.isValid())
         return 0;
     return m_messages.count();
 }
 
-QVariant ChatModel::data(const QModelIndex &index, int role) const {
+QVariant ChatModel::data(const QModelIndex &index, int role) const
+{
     if (!index.isValid() || index.row() >= m_messages.count())
         return QVariant();
 
     const ChatMessage &message = m_messages.at(index.row());
     switch (role) {
-    case IsLocalMessageRole: return message.isLocalMessage();
-    case TextRole: return message.text();
-    case TimestampRole: return message.timestamp();
-    case PromptTokensRole: return message.promptTokens();
-    case CompletionTokensRole: return message.completionTokens();
-    case RoleRole: return message.role();
+    case IsLocalMessageRole:
+        return message.isLocalMessage();
+    case TextRole:
+        return message.text();
+    case TimestampRole:
+        return message.timestamp();
+    case PromptTokensRole:
+        return message.promptTokens();
+    case CompletionTokensRole:
+        return message.completionTokens();
+    case RoleRole:
+        return message.role();
     }
     return QVariant();
 }
 
-QHash<int, QByteArray> ChatModel::roleNames() const {
+QHash<int, QByteArray> ChatModel::roleNames() const
+{
     QHash<int, QByteArray> roles;
     roles[IsLocalMessageRole] = "isLocalMessage";
     roles[TextRole] = "text";
@@ -74,25 +91,46 @@ void ChatModel::sendMessage(const QString &messageText)
     addMessage(userMessage);
 
     // 2. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
-    m_interlocutor->sendRequest(m_messages);
+    InterlocutorConfig *config
+        = findCurrentConfig(); // Vous aurez besoin d'une fonction pour ça via ChatManager
+    QStringList attachments;
+    if (config && !config->ancientMemoryFileId().isEmpty()) {
+        attachments.append(config->ancientMemoryFileId());
+    }
+
+    // On envoie la requête avec l'historique ET la pièce jointe
+    m_interlocutor->sendRequest(m_messages, attachments);
 }
 
-void ChatModel::handleInterlocutorResponse(const QJsonObject &response) {
+void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
+{
     // On vérifie si cette réponse concerne la curation ou un chat normal.
     if (m_isWaitingForCurationResponse) {
-        qDebug() << "Curation response received.";
-        QString summaryText;
+        qDebug() << "Step 3/4 Curation response received.";
+        m_isWaitingForCurationResponse = false;
 
+        // On supprime le fichier temporaire de la mémoire vive
+        m_interlocutor->deleteFile(m_liveMemoryFileIdForCuration);
+        m_liveMemoryFileIdForCuration.clear();
+
+        QString newSummary;
         // Extraire le résumé de la réponse
         if (response.contains("choices") && response["choices"].isArray()) {
             QJsonArray choicesArray = response["choices"].toArray();
             if (!choicesArray.isEmpty()) {
-                summaryText = choicesArray[0].toObject()["message"].toObject()["content"].toString();
+                newSummary = choicesArray[0].toObject()["message"].toObject()["content"].toString();
             }
         }
 
-        if (!summaryText.isEmpty()) {
-            saveOlderMemory(summaryText);
+        if (!newSummary.isEmpty()) {
+            qDebug() << "Step 4/4: Uploading new ancient memory...";
+            saveOlderMemory(newSummary);
+            // On stocke l'ID de l'ancienne mémoire pour la supprimer après le nouvel upload
+            InterlocutorConfig *config = findCurrentConfig();
+            if (config && !config->ancientMemoryFileId().isEmpty()) {
+                m_oldAncientMemoryFileIdToDelete = config->ancientMemoryFileId();
+            }
+            m_interlocutor->uploadFile(newSummary.toUtf8(), "assistants");
             qDebug() << "Older memory successfully updated.";
             emit curationFinished(true);
         } else {
@@ -191,7 +229,8 @@ void ChatModel::addMessage(const ChatMessage &message)
     // On retire l'appel à updateTokenCount() d'ici.
 }
 
-void ChatModel::loadChat(const QString &filePath) {
+void ChatModel::loadChat(const QString &filePath)
+{
     if (m_currentChatFilePath == filePath && !filePath.isEmpty()) {
         qDebug() << "Chat file already loaded or path is the same:" << filePath;
         return;
@@ -255,8 +294,8 @@ void ChatModel::loadChat(const QString &filePath) {
     checkCurationThreshold();
 }
 
-
-void ChatModel::saveChat() {
+void ChatModel::saveChat()
+{
     // Le mécanisme de `addMessage` sauvegarde déjà chaque message individuellement.
     // Cette méthode `saveChat` serait utile si on voulait réécrire tout le fichier
     // après une modification ou une curation, ou nous travaiilons avec un buffer en RAM.
@@ -265,7 +304,8 @@ void ChatModel::saveChat() {
     qDebug() << "ChatModel::saveChat() called. Doing nothing. Messages are saved incrementally.";
 }
 
-void ChatModel::clearChat() {
+void ChatModel::clearChat()
+{
     if (m_messages.isEmpty())
         return;
 
@@ -289,8 +329,8 @@ void ChatModel::clearChat() {
     emit chatError("Chat cleared.");
 }
 
-
-void ChatModel::setCurrentChatFilePath(const QString &path) {
+void ChatModel::setCurrentChatFilePath(const QString &path)
+{
     if (m_currentChatFilePath == path)
         return;
     // La logique de loadChat gère déjà la sauvegarde de l'ancien chat et le changement de chemin
@@ -329,19 +369,56 @@ void ChatModel::checkCurationThreshold()
     }
 }
 
-void ChatModel::setInterlocutor(Interlocutor *interlocutor) {
+void ChatModel::setInterlocutor(Interlocutor *interlocutor)
+{
     // Déconnecter l'ancien interlocuteur s'il existe
     if (m_interlocutor) {
-        disconnect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
-        disconnect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
+        disconnect(m_interlocutor,
+                   &Interlocutor::responseReceived,
+                   this,
+                   &ChatModel::handleInterlocutorResponse);
+        disconnect(m_interlocutor,
+                   &Interlocutor::errorOccurred,
+                   this,
+                   &ChatModel::handleInterlocutorError);
+        disconnect(m_interlocutor,
+                   &Interlocutor::fileUploaded,
+                   this,
+                   &ChatModel::onNewAncientMemoryUploaded);
+        disconnect(m_interlocutor,
+                   &Interlocutor::fileUploadFailed,
+                   this,
+                   &ChatModel::onCurationUploadFailed);
+        disconnect(m_interlocutor,
+                   &Interlocutor::fileDeleted,
+                   this,
+                   &ChatModel::onOldAncientMemoryDeleted);
     }
 
     m_interlocutor = interlocutor;
 
     // Connecter le nouvel interlocuteur s'il n'est pas nul
     if (m_interlocutor) {
-        connect(m_interlocutor, &Interlocutor::responseReceived, this, &ChatModel::handleInterlocutorResponse);
-        connect(m_interlocutor, &Interlocutor::errorOccurred, this, &ChatModel::handleInterlocutorError);
+        connect(m_interlocutor,
+                &Interlocutor::responseReceived,
+                this,
+                &ChatModel::handleInterlocutorResponse);
+        connect(m_interlocutor,
+                &Interlocutor::errorOccurred,
+                this,
+                &ChatModel::handleInterlocutorError);
+        connect(m_interlocutor,
+                &Interlocutor::fileUploaded,
+                this,
+                &ChatModel::onNewAncientMemoryUploaded);
+        connect(m_interlocutor,
+                &Interlocutor::fileUploadFailed,
+                this,
+                &ChatModel::onCurationUploadFailed);
+        connect(m_interlocutor,
+                &Interlocutor::fileDeleted,
+                this,
+                &ChatModel::onOldAncientMemoryDeleted);
     }
 }
 
@@ -366,8 +443,10 @@ void ChatModel::rewriteChatFile()
     qDebug() << "Chat file rewritten successfully:" << m_currentChatFilePath;
 }
 
-void ChatModel::triggerCuration() {
-    if (m_isCurationInProgress) return; // Sécurité supplémentaire
+void ChatModel::triggerCuration()
+{
+    if (m_isCurationInProgress)
+        return; // Sécurité supplémentaire
 
     qDebug() << "Starting curation process...";
     m_isCurationInProgress = true;
@@ -384,7 +463,8 @@ void ChatModel::triggerCuration() {
 
         int msgTokens = msg.promptTokens() + msg.completionTokens();
         // Estimation si les tokens sont à 0
-        if (msgTokens == 0) msgTokens = msg.text().length() / 4;
+        if (msgTokens == 0)
+            msgTokens = msg.text().length() / 4;
 
         m_liveMemoryTokens -= msgTokens;
         m_messages.removeFirst();
@@ -395,7 +475,7 @@ void ChatModel::triggerCuration() {
         qDebug() << "Culling" << numMessagesToRemove << "messages from live memory.";
         beginRemoveRows(QModelIndex(), 0, numMessagesToRemove - 1);
         endRemoveRows();
-        rewriteChatFile(); // On met à jour le fichier de la mémoire vive
+        rewriteChatFile();              // On met à jour le fichier de la mémoire vive
         emit liveMemoryTokensChanged(); // On notifie l'UI du nouveau total de tokens
     } else {
         qWarning() << "Curation triggered, but no messages to cull. Aborting.";
@@ -406,51 +486,77 @@ void ChatModel::triggerCuration() {
     // --- Phase 2: Préparation de la requête de résumé ---
     QString olderMemory = loadOlderMemory();
     QString conversationToSummarize;
-
-    // On transforme la liste des messages en un dialogue textuel
-    for (const auto& msg : messagesToCurate) {
-        QString role = msg.isLocalMessage() ? "User" : "Assistant";
-        conversationToSummarize += role + ": " + msg.text() + "\n\n";
+    for (const auto &msg : messagesToCurate) { /* ... */
     }
 
-    // On construit le prompt final
-    QString curationPrompt = "You are a memory assistant. Your task is to update a long-term memory summary."
-                             "Below is the existing summary, followed by the most recent conversation transcript that needs to be integrated."
-                             "Rewrite the summary to incorporate the new key information, facts, user preferences, and important events from the transcript."
-                             "The new summary should be a concise, coherent narrative. Discard trivial details.\n\n"
-                             "--- EXISTING SUMMARY ---\n" +
-                             (olderMemory.isEmpty() ? "None." : olderMemory) +
-                             "\n\n--- RECENT TRANSCRIPT TO INTEGRATE ---\n" +
-                             conversationToSummarize;
+    qDebug() << "Step 1/4: Uploading live memory for curation...";
+    // On connecte un slot spécifique pour cette étape
+    connect(m_interlocutor,
+            &Interlocutor::fileUploaded,
+            this,
+            &ChatModel::onLiveMemoryUploadedForCuration,
+            Qt::SingleShotConnection);
+    m_interlocutor->uploadFile(conversationToSummarize.toUtf8(),
+                               "assistants"); // "assistants" est le 'purpose' pour OpenAI
+}
 
-    // --- Phase 3: Appel asynchrone à l'IA ---
-    qDebug() << "Sending request for curation summary...";
+InterlocutorConfig *ChatModel::findCurrentConfig()
+{
+    QObject *parentObj = parent();
+    if (parentObj) {
+        // Vous pouvez maintenant utiliser parentObj
+        ChatManager *chatManager = qobject_cast<ChatManager *>(parentObj);
+        if (chatManager) {
+            return chatManager;
+        }
+    }
+    return nullptr;
+}
+
+void ChatModel::onLiveMemoryUploadedForCuration(const QString &fileId, const QString &purpose)
+{
+    if (purpose != "assistants")
+        return; // S'assurer que c'est le bon signal
+
+    qDebug() << "Step 2/4: Live memory uploaded (ID:" << fileId << "). Sending curation request...";
+    m_liveMemoryFileIdForCuration = fileId; // On stocke l'ID pour pouvoir le supprimer plus tard
+
+    // Construire le prompt de curation
+    QString olderMemory = loadOlderMemory();
+    QString curationPrompt
+        = "You are a memory assistant. Your task is to update a long-term memory summary."
+          "The full transcript of the recent conversation is in the attached file. "
+          "Please read the existing summary below, then read the attached file, and finally "
+          "produce a new, updated summary that integrates the key information from the "
+          "transcript.\n\n"
+          "--- EXISTING SUMMARY ---\n"
+          + (olderMemory.isEmpty() ? "None." : olderMemory);
+
+    // On envoie la requête de curation en attachant le fichier de mémoire vive
     m_isWaitingForCurationResponse = true;
-    // On crée une liste temporaire pour notre requête de curation
     QList<ChatMessage> curationRequestHistory;
-
-    // On y place notre prompt de curation comme un unique message de l'utilisateur
-    // Les autres champs (timestamp, tokens) n'ont pas d'importance ici.
     curationRequestHistory.append(
         ChatMessage(true, curationPrompt, QDateTime::currentDateTime(), 0, 0, "user"));
-
-    // On appelle la méthode sendRequest avec la signature correcte
-    m_interlocutor->sendRequest(curationRequestHistory);
+    m_interlocutor->sendRequest(curationRequestHistory, {fileId});
 }
 
 // --- Implémentation des nouvelles fonctions utilitaires ---
 
-QString ChatModel::getOlderMemoryFilePath() const {
-    if (m_currentChatFilePath.isEmpty()) return "";
+QString ChatModel::getOlderMemoryFilePath() const
+{
+    if (m_currentChatFilePath.isEmpty())
+        return "";
     // On base le nom du fichier de mémoire sur celui du chat
     // ex: "default_chat.jsonl" -> "default_chat_memory.txt"
     QFileInfo fileInfo(m_currentChatFilePath);
     return fileInfo.path() + "/" + fileInfo.baseName() + "_memory.txt";
 }
 
-QString ChatModel::loadOlderMemory() {
+QString ChatModel::loadOlderMemory()
+{
     QString memoryFilePath = getOlderMemoryFilePath();
-    if (memoryFilePath.isEmpty()) return "";
+    if (memoryFilePath.isEmpty())
+        return "";
 
     QFile file(memoryFilePath);
     if (!file.open(QFile::ReadOnly | QFile::Text)) {
@@ -460,7 +566,8 @@ QString ChatModel::loadOlderMemory() {
     return in.readAll();
 }
 
-void ChatModel::saveOlderMemory(const QString &content) {
+void ChatModel::saveOlderMemory(const QString &content)
+{
     QString memoryFilePath = getOlderMemoryFilePath();
     if (memoryFilePath.isEmpty()) {
         qWarning() << "Cannot save older memory: no current chat file path set.";
@@ -474,5 +581,44 @@ void ChatModel::saveOlderMemory(const QString &content) {
     }
     QTextStream out(&file);
     out << content;
+}
+
+void ChatModel::onNewAncientMemoryUploaded(const QString &newFileId, const QString &purpose)
+{
+    if (purpose != "assistants")
+        return;
+    qDebug() << "New ancient memory uploaded (ID:" << newFileId << "). Updating config...";
+
+    // Mettre à jour la config avec le nouvel ID
+    InterlocutorConfig *config = findCurrentConfig();
+    if (config) {
+        config->setAncientMemoryFileId(newFileId);
+        // Il faut une façon de dire au ChatManager de sauvegarder
+        // chatManager->saveInterlocutorsToDisk(); // Idéalement via un signal
+    }
+
+    // Si une ancienne mémoire existait, on la supprime
+    if (!m_oldAncientMemoryFileIdToDelete.isEmpty()) {
+        qDebug() << "Deleting old ancient memory file (ID:" << m_oldAncientMemoryFileIdToDelete
+                 << ")";
+        m_interlocutor->deleteFile(m_oldAncientMemoryFileIdToDelete);
+    } else {
+        m_isCurationInProgress = false; // Fin du processus
+    }
+}
+
+void ChatModel::onOldAncientMemoryDeleted(const QString &fileId, bool success)
+{
+    qDebug() << "Old ancient memory file deletion result:" << success;
+    m_oldAncientMemoryFileIdToDelete.clear();
+    m_isCurationInProgress = false; // C'est la toute fin du processus de curation !
+}
+
+void ChatModel::onCurationUploadFailed(const QString &error)
+{
+    qWarning() << "Curation process failed at upload stage:" << error;
+    // Gérer l'erreur : réinitialiser les flags, notifier l'utilisateur...
+    m_isCurationInProgress = false;
+    m_isWaitingForCurationResponse = false;
 }
 // End Source File: ChatModel.cpp
