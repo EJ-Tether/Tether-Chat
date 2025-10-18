@@ -58,6 +58,8 @@ QVariant ChatModel::data(const QModelIndex &index, int role) const
         return message.completionTokens();
     case RoleRole:
         return message.role();
+    case IsTypingIndicatorRole:
+        return message.isTypingIndicator;
     }
     return QVariant();
 }
@@ -71,11 +73,15 @@ QHash<int, QByteArray> ChatModel::roleNames() const
     roles[PromptTokensRole] = "promptTokens";
     roles[CompletionTokensRole] = "completionTokens";
     roles[RoleRole] = "role";
+    roles[IsTypingIndicatorRole] = "isTypingIndicator";
     return roles;
 }
 
 void ChatModel::sendMessage(const QString &messageText)
 {
+    if (m_isWaitingForReply) // Empêcher d'envoyer un message pendant l'attente
+        return;
+
     if (!m_interlocutor) {
         emit chatError("Interlocutor is not set.");
         return;
@@ -91,7 +97,7 @@ void ChatModel::sendMessage(const QString &messageText)
                             "user");
     addMessage(userMessage);
 
-    // 2. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
+    // 3. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
     InterlocutorConfig *config
         = findCurrentConfig(); // Vous aurez besoin d'une fonction pour ça via ChatManager
     QStringList attachments;
@@ -101,11 +107,20 @@ void ChatModel::sendMessage(const QString &messageText)
 
     // On envoie la requête avec l'historique ET la pièce jointe
     m_interlocutor->sendRequest(m_messages, attachments);
+
+    // 2. Gérer la logique de l'indicateur d'attente de réponse
+    setWaitingForReply(true);
+
+    // Ajouter un message spécial "indicateur d'attente"
+    ChatMessage typingIndicator(false, "", QDateTime::currentDateTime(), 0, 0, "assistant");
+    typingIndicator.isTypingIndicator = true;
+    addMessage(typingIndicator);
 }
 
 void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
 {
-    // On vérifie si cette réponse concerne la curation ou un chat normal.
+    // 1. Si la requête était une demande de curation de la mémoire ancienne,
+    // On va la traiter ici.
     if (m_isWaitingForCurationResponse) {
         qDebug() << "Step 3/4 Curation response received.";
         m_isWaitingForCurationResponse = false;
@@ -145,7 +160,15 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
         return; // Le traitement de cette réponse est terminé.
     }
     // --- FIN DE LA LOGIQUE DE CURATION ---
-    // Extraire le contenu du message de l'IA de la réponse (structure OpenAI-like)
+
+    // 2. Retirer l'indicateur d'attente de réponse, qui est le dernier message de la liste
+    if (!m_messages.isEmpty() && m_messages.last().isTypingIndicator) {
+        beginRemoveRows(QModelIndex(), m_messages.count() - 1, m_messages.count() - 1);
+        m_messages.removeLast();
+        endRemoveRows();
+    }
+
+    // 3. Extraire le contenu du message de l'IA de la réponse (structure OpenAI-like)
     QString aiResponseText;
     int promptTokens = 0;
     int completionTokens = 0;
@@ -171,7 +194,7 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
         totalTokensForThisExchange = usage["total_tokens"].toInt(0);
     }
 
-    // 1. Mettre à jour la taille de la Mémoire Vive pour la curation
+    // 4. Mettre à jour la taille de la Mémoire Vive pour la curation
     // La nouvelle taille est simplement le `prompt_tokens` (qui inclut l'historique) + `completion_tokens`.
     int newLiveMemorySize = promptTokens + completionTokens;
     if (m_liveMemoryTokens != newLiveMemorySize) {
@@ -180,11 +203,13 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
         qDebug() << "Live Memory size is now:" << m_liveMemoryTokens << "tokens.";
     }
 
-    // 2. Mettre à jour le coût cumulatif pour l'utilisateur
+    // 5. Mettre à jour le coût cumulatif pour l'utilisateur
     // On AJOUTE le coût de cet échange au total.
     m_cumulativeTokenCost += totalTokensForThisExchange;
     emit cumulativeTokenCostChanged();
     qDebug() << "Cumulative token cost is now:" << m_cumulativeTokenCost;
+
+    setWaitingForReply(false); // Fin de l'attente
 
     // Ajouter le message de l'IA au modèle, en stockant les tokens de cet échange
     ChatMessage aiMessage(false,
@@ -195,12 +220,21 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
                           "assistant");
     addMessage(aiMessage);
 
+    // 6. Vérifier si il y a nécessité de faire une curation de la mémoire ancienne.
     // La curation est basée sur la taille de la mémoire vive
     checkCurationThreshold();
 }
 
 void ChatModel::handleInterlocutorError(const QString &error)
 {
+    // Retirer l'indicateur "attente de réponse" même en cas d'erreur
+    if (!m_messages.isEmpty() && m_messages.last().isTypingIndicator) {
+        beginRemoveRows(QModelIndex(), m_messages.count() - 1, m_messages.count() - 1);
+        m_messages.removeLast();
+        endRemoveRows();
+    }
+    setWaitingForReply(false);
+
     qWarning() << "Interlocutor Error:" << error;
     emit chatError("Error from AI: " + error);
     // Optionnel: ajouter un message d'erreur visible dans le chat
@@ -215,8 +249,8 @@ void ChatModel::addMessage(const ChatMessage &message)
     m_messages.append(message);
     endInsertRows();
 
-    // Persister le message dans le fichier jsonl
-    if (!m_currentChatFilePath.isEmpty()) {
+    // Persister le message dans le fichier jsonl si ce n'est pas un typing indicator
+    if (!message.isTypingIndicator && !m_currentChatFilePath.isEmpty()) {
         QFile file(m_currentChatFilePath);
         if (file.open(QFile::Append | QFile::Text)) {
             QTextStream stream(&file);
@@ -227,7 +261,13 @@ void ChatModel::addMessage(const ChatMessage &message)
         }
     }
     emit chatMessageAdded(message);
-    // On retire l'appel à updateTokenCount() d'ici.
+}
+
+void ChatModel::setWaitingForReply(bool waiting) {
+    if (m_isWaitingForReply != waiting) {
+        m_isWaitingForReply = waiting;
+        emit isWaitingForReplyChanged();
+    }
 }
 
 void ChatModel::loadChat(const QString &filePath)

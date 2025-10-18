@@ -169,6 +169,11 @@ ApplicationWindow {
                                 // On demande à la vue de se positionner à la fin de son contenu.
                                 positionViewAtEnd()
                             }
+                            Connections {
+                                target: _chatManager.chatModel
+                                function onModelReset() { Qt.callLater(_messageListView.positionViewAtEnd); }
+                                function onChatMessageAdded() { _messageListView.positionViewAtEnd(); }
+                            }
                             delegate: Item {
                                 id: _singleMessageArea
                                 // _singleMessageArea : is the invisible rectangle occupying the full
@@ -183,6 +188,7 @@ ApplicationWindow {
                                     id: _messageBubble
                                     // _messageBubble: the visible rectangle with rounded corners with
                                     // the message inside.
+                                    visible: !model.isTypingIndicator
                                     width: Math.min(_messageText.implicitWidth + 20, parent.width * 0.8)
                                     height: _messageText.implicitHeight + 20
                                     radius: 12
@@ -206,13 +212,44 @@ ApplicationWindow {
                                     }
 
                                 }
-                            }
-                            // When the `Interlocutor` model will be implemented as a `QAbstractListModel`,
-                            // we must connect the signals/slots so the QML reflects the new reply
-                            Connections {
-                                target: _chatManager.chatModel
-                                function onChatMessageAdded() {
-                                    _messageListView.positionViewAtEnd()
+                                Item {
+                                    id: typingIndicator
+                                    visible: model.isTypingIndicator
+                                    width: 80
+                                    height: 40
+                                    // Ancré à gauche comme un message de l'IA
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 10
+
+                                    RowLayout {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: 3 // Créer 3 points
+
+                                            delegate: Rectangle {
+                                                width: 12
+                                                height: 12
+                                                radius: 6 // Pour faire un cercle
+                                                color: "gray"
+                                                opacity: 0.5
+
+                                                // Animation de pulsation
+                                                SequentialAnimation on y {
+                                                    loops: Animation.Infinite
+                                                    // Attendre un peu avant de commencer (crée l'effet de vague)
+                                                    PauseAnimation { duration: index * 150 }
+                                                    // Monter
+                                                    NumberAnimation { to: -5; duration: 300; easing.type: Easing.InOutQuad }
+                                                    // Redescendre
+                                                    NumberAnimation { to: 0; duration: 300; easing.type: Easing.InOutQuad }
+                                                    // Pause en bas
+                                                    PauseAnimation { duration: 400 }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -369,13 +406,30 @@ ApplicationWindow {
 
                     // On affiche le formulaire seulement si un item est sélectionné ou en cours de création
                     enabled: _chatManager.currentConfig !== null
-                    // *** POINT CRUCIAL DE SYNCHRONISATION ***
                     // Ce bloc écoute le changement de l'objet de configuration C++
                     Connections {
                         target: _chatManager
+                        // Ce signal est émis chaque fois qu'on sélectionne un interlocuteur existant
+                        // ou qu'on en crée un nouveau.
                         function onCurrentConfigChanged() {
-                            // Dès que l'objet C++ change (sélection ou nouvelle création), on synchronise l'UI
-                            syncProviderModel();
+                            if (!_chatManager.currentConfig) return;
+
+                            // 1. Mettre à jour la ComboBox des fournisseurs
+                            providerComboBox.currentIndex = providerComboBox.model.indexOf(_chatManager.currentConfig.type);
+
+                            // 2. Mettre à jour le modèle de la ComboBox des modèles
+                            var provider = _chatManager.currentConfig.type;
+                            if (provider) {
+                                modelComboBox.model = _chatManager.modelsForProvider(provider);
+                            } else {
+                                modelComboBox.model = []; // Vider si pas de provider
+                            }
+
+                            // 3. Mettre à jour la sélection de la ComboBox des modèles
+                            // On utilise Qt.callLater pour laisser le temps au modèle de se mettre à jour
+                            Qt.callLater(function() {
+                                modelComboBox.currentIndex = modelComboBox.model.indexOf(_chatManager.currentConfig.modelName);
+                            });
                         }
                     }
 
@@ -440,10 +494,10 @@ ApplicationWindow {
                                 id: modelComboBox
                                 Layout.fillWidth: true
                                 onActivated: (index) => {
-                                       if (!_chatManager.currentConfig) return;
-                                       // Synchronisation vers le C++ (met à jour modelName et endpointUrl)
-                                       _chatManager.updateConfigWithModel(model[index]);
-                                   }
+                                                 if (!_chatManager.currentConfig) return;
+                                                 // Synchronisation vers le C++ (met à jour modelName et endpointUrl)
+                                                 _chatManager.updateConfigWithModel(model[index]);
+                                             }
                             }
 
                             // Clé API

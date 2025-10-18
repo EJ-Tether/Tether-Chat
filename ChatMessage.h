@@ -52,6 +52,7 @@ public:
         obj["promptTokens"] = m_promptTokens;
         obj["completionTokens"] = m_completionTokens;
         obj["role"] = m_role;
+        obj["isTypingIndicator"] = isTypingIndicator;
         return obj;
     }
 
@@ -63,9 +64,10 @@ public:
         msg.m_promptTokens = obj["promptTokens"].toInt();
         msg.m_completionTokens = obj["completionTokens"].toInt();
         msg.m_role = obj["role"].toString();
+        msg.isTypingIndicator = obj["isTypingIndicator"].toBool(false);
         return msg;
     }
-
+    bool isTypingIndicator = false;
 private:
     bool m_isLocalMessage;
     QString m_text;

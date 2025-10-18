@@ -25,7 +25,8 @@ public:
         TimestampRole,
         PromptTokensRole,
         CompletionTokensRole,
-        RoleRole // "user" ou "assistant"
+        RoleRole, // "user" ou "assistant"
+        IsTypingIndicatorRole
     };
     Q_ENUM(ChatMessageRoles)
 
@@ -59,6 +60,9 @@ public:
     int cumulativeTokenCost() const { return m_cumulativeTokenCost; }
     Q_INVOKABLE void resetTokenCost(); // méthode pour le bouton "Reset"
 
+    Q_PROPERTY(bool isWaitingForReply READ isWaitingForReply NOTIFY isWaitingForReplyChanged)
+    bool isWaitingForReply() const { return m_isWaitingForReply; }
+
 signals:
     void currentChatFilePathChanged();
     void liveMemoryTokensChanged();
@@ -67,6 +71,7 @@ signals:
     void chatError(const QString &error);
     void curationNeeded(); // Signal pour indiquer qu'une curation est nécessaire
     void curationFinished(bool success); // Signal utile pour notifier l'UI
+    void isWaitingForReplyChanged();
 
 private slots:
     void handleInterlocutorResponse(const QJsonObject &response);
@@ -90,20 +95,25 @@ private:
     int m_cumulativeTokenCost = 0;
 
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    const int BASE_LIVE_MEMORY_TOKENS = 10000 ;/* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 100000;
+    const int BASE_LIVE_MEMORY_TOKENS = 5000 ;/* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 100000;
     // Seuil de déclenchement de la curation (par exemple, 120K)
-    const int CURATION_TRIGGER_TOKENS = 12000 ; /* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 120000;
+    const int CURATION_TRIGGER_TOKENS = 6000 ; /* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 120000;
     void rewriteChatFile();
 
     // Gestion de la curation
     QString getOlderMemoryFilePath() const; // Donne le chemin du fichier de mémoire ancienne
     QString loadOlderMemory(); // Charge le contenu de la mémoire ancienne
     void saveOlderMemory(const QString& content); // Sauvegarde la mémoire ancienne
+
     // Flags pour gérer le processus de curation asynchrone
     bool m_isCurationInProgress = false;
     bool m_isWaitingForCurationResponse = false;
     QString m_liveMemoryFileIdForCuration;
     QString m_oldAncientMemoryFileIdToDelete;
+
+    // Code pour gérer l'état d'attente de réponse
+    void setWaitingForReply(bool waiting); // Setter privé pour gérer l'état
+    bool m_isWaitingForReply = false;
 };
 
 #endif // CHATMODEL_H

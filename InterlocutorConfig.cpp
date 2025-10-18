@@ -73,6 +73,8 @@ void InterlocutorConfig::read(const QJsonObject &json) {
     setApiKey(json["apiKey"].toString());
     setEndpointUrl(json["endpointUrl"].toString());
     setSystemPrompt(json["systemPrompt"].toString());
+    setModelName(json["modelName"].toString());
+
 }
 
 void InterlocutorConfig::write(QJsonObject &json) const {
@@ -81,4 +83,5 @@ void InterlocutorConfig::write(QJsonObject &json) const {
     json["apiKey"] = m_apiKey;
     json["endpointUrl"] = m_endpointUrl;
     json["systemPrompt"] = m_systemPrompt;
+    json["modelName"] = m_modelName;
 }

@@ -209,12 +209,14 @@ void ChatManager::updateConfigWithModel(const QString &modelDisplayName)
 
     ModelInfo model = m_modelRegistry.findModel(modelDisplayName);
     if (!model.displayName.isEmpty()) {
+        // On s'assure que le "type" (provider) est aussi synchronisé
+        m_currentConfig->setType(model.provider);
         m_currentConfig->setModelName(model.displayName);
-
-        // Mettre à jour l'URL en remplaçant le placeholder
         QString endpoint = model.endpointTemplate;
         endpoint.replace("%MODEL_NAME%", model.internalName);
+
         m_currentConfig->setEndpointUrl(endpoint);
+        m_currentConfig->setModelName(model.displayName);
     }
 }
 
