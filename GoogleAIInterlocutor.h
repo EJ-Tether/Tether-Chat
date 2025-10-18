@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QUrl>
+#include <QDebug>
+
 #include "Interlocutor.h"
 
 class GoogleAIInterlocutor : public Interlocutor
@@ -19,6 +21,12 @@ public:
     Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
                                  const QStringList &attachmentFileIds) override;
     void setSystemPrompt(const QString &systemPrompt) override;
+    void uploadFile(const QByteArray &content, const QString &purpose) override {
+        qDebug()<<"GoogleAIInterlocutor::uploadFile:"<<content<<purpose;
+    }
+    void deleteFile(const QString &fileId) override {
+        qDebug()<<"GoogleAIInterlocutor::deleteFile:"<<fileId;
+    }
 
 private:
     QString m_apiKey;

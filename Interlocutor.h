@@ -13,7 +13,8 @@ public:
     explicit Interlocutor(QString interlocutorName, QObject *parent = nullptr)
         : m_interlocutorName(interlocutorName)
         , QObject(parent)
-    {}
+    {
+    }
     virtual ~Interlocutor() {}
 
     Q_INVOKABLE virtual void sendRequest(const QList<ChatMessage> &history,

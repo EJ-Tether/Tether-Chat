@@ -11,6 +11,9 @@ void ModelRegistry::populateModels() {
     m_models.append({"OpenAI", "GPT-4o", "gpt-4o", "https://api.openai.com/v1/chat/completions"});
     m_models.append({"OpenAI", "GPT-4 Turbo", "gpt-4-turbo", "https://api.openai.com/v1/chat/completions"});
     m_models.append({"OpenAI", "GPT-3.5 Turbo", "gpt-3.5-turbo", "https://api.openai.com/v1/chat/completions"});
+    m_models.append({"OpenAI", "GPT-5", "gpt-5", "https://api.openai.com/v1/chat/completions"});
+    m_models.append({"OpenAI", "GPT-5 mini", "gpt-5-mini", "https://api.openai.com/v1/chat/completions"});
+    m_models.append({"OpenAI", "GPT-5 nano", "gpt-5-nano", "https://api.openai.com/v1/chat/completions"});
 
     m_models.append({"Google", "Gemini 1.5 Pro", "gemini-1.5-pro", "https://generativelanguage.googleapis.com/v1beta/models/%MODEL_NAME%:generateContent"});
     m_models.append({"Google", "Gemini 1.0 Pro", "gemini-1.0-pro", "https://generativelanguage.googleapis.com/v1beta/models/%MODEL_NAME%:generateContent"});

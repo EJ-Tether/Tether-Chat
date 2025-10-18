@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 #include "InterlocutorConfig.h"
+#include "ChatManager.h"
 
 ChatModel::ChatModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -500,14 +501,12 @@ void ChatModel::triggerCuration()
                                "assistants"); // "assistants" est le 'purpose' pour OpenAI
 }
 
-InterlocutorConfig *ChatModel::findCurrentConfig()
-{
-    QObject *parentObj = parent();
+InterlocutorConfig *ChatModel::findCurrentConfig() {
+    QObject* parentObj = parent();
     if (parentObj) {
-        // Vous pouvez maintenant utiliser parentObj
-        ChatManager *chatManager = qobject_cast<ChatManager *>(parentObj);
+        ChatManager* chatManager = qobject_cast<ChatManager*>(parentObj);
         if (chatManager) {
-            return chatManager;
+            return chatManager->findCurrentConfig();
         }
     }
     return nullptr;

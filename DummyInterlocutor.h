@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QDebug>
 
 class DummyInterlocutor : public Interlocutor
 {
@@ -15,6 +16,14 @@ public:
 
     Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
                                  const QStringList &attachmentFileIds) override;
+
+    void uploadFile(const QByteArray &content, const QString &purpose) override {
+        qDebug()<<"DummyInterlocutor::uploadFile:"<<content<<purpose;
+    }
+    void deleteFile(const QString &fileId) override {
+        qDebug()<<"DummyInterlocutor::deleteFile:"<<fileId;
+    }
+
 
 private:
     QTimer *m_responseTimer;

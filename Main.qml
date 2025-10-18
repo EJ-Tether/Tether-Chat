@@ -119,7 +119,7 @@ ApplicationWindow {
 
                 onActivated: (index) => {
                                  // Quand l'utilisateur choisit, on appelle le manager
-                                 chatManager.switchToInterlocutor(interlocutorSelector.model[index])
+                                 _chatManager.switchToInterlocutor(interlocutorSelector.model[index])
                              }
             }
             Item {
@@ -296,6 +296,29 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 spacing: 10
                 visible: _tabBar.currentIndex === 1 // S'assurer que la visibilité est bien gérée
+                // Fonction QML pour synchroniser les ComboBoxs de Provider et Model
+                function syncProviderModel() {
+                    if (!_chatManager.currentConfig) return;
+
+                    // 1. Synchroniser le Provider ComboBox
+                    let providerIndex = providerComboBox.model.indexOf(_chatManager.currentConfig.type);
+                    providerComboBox.currentIndex = providerIndex;
+
+                    // 2. Charger le modèle des modèles pour ce provider
+                    let providerName = providerIndex >= 0 ? providerComboBox.model[providerIndex] : "";
+                    modelComboBox.model = _chatManager.modelsForProvider(providerName);
+
+                    // 3. Synchroniser le Model ComboBox
+                    let modelIndex = modelComboBox.model.indexOf(_chatManager.currentConfig.modelName);
+                    modelComboBox.currentIndex = modelIndex;
+
+                    // CORRECTION: Si le fournisseur est chargé sans modèle (nouvelle config), on choisit le premier
+                    if (modelIndex < 0 && modelComboBox.model && modelComboBox.model.length > 0 && !_chatManager.currentConfig.modelName) {
+                        modelComboBox.currentIndex = 0;
+                        // On déclenche l'action associée pour mettre à jour l'URL et le nom dans la config
+                        modelComboBox.onActivated(0);
+                    }
+                }
 
                 // --- Panneau de gauche : Liste des interlocuteurs ---
                 Frame {
@@ -328,7 +351,6 @@ ApplicationWindow {
                                 }
                             }
                         }
-
                         Button {
                             text: "Add New Interlocutor"
                             Layout.fillWidth: true
@@ -347,6 +369,15 @@ ApplicationWindow {
 
                     // On affiche le formulaire seulement si un item est sélectionné ou en cours de création
                     enabled: _chatManager.currentConfig !== null
+                    // *** POINT CRUCIAL DE SYNCHRONISATION ***
+                    // Ce bloc écoute le changement de l'objet de configuration C++
+                    Connections {
+                        target: _chatManager
+                        function onCurrentConfigChanged() {
+                            // Dès que l'objet C++ change (sélection ou nouvelle création), on synchronise l'UI
+                            syncProviderModel();
+                        }
+                    }
 
                     ScrollView {
                         anchors.fill: parent
@@ -355,8 +386,19 @@ ApplicationWindow {
                             width: parent.width
                             columns: 2
 
+                            Item {
+                                id: filler1
+                                width: 10
+                                height: 10
+                            }
+                            Item {
+                                id: filler2
+                                width: 10
+                                height: 10
+                            }
+
                             // Le nom (ne peut pas être édité pour un existant pour l'instant)
-                            Label { text: "Name:" }
+                            Label { text: qsTr("Name:") }
                             TextField {
                                 id: nameField
                                 Layout.fillWidth: true
@@ -366,50 +408,42 @@ ApplicationWindow {
                                 onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.name = text
                             }
 
-                            Label { text: "Provider:" }
+                            Label { text: qsTr("Provider:") }
                             ComboBox {
                                 id: providerComboBox
                                 Layout.fillWidth: true
                                 model: _chatManager.availableProviders
 
-                                // Quand on sélectionne un fournisseur, on met à jour le modèle de la ComboBox des modèles
+                                // Mettre à jour config.type et charge le modèle de la ComboBox suivante.
                                 onActivated: (index) => {
-                                    if (!_chatManager.currentConfig) return;
-                                    _chatManager.currentConfig.type = model[index];
-                                    // On demande au C++ la liste des modèles pour ce fournisseur
-                                    modelComboBox.model = _chatManager.modelsForProvider(model[index]);
-                                }
+                                                 if (!_chatManager.currentConfig) return;
 
-                                // Initialisation
-                                Component.onCompleted: {
-                                    if (_chatManager.currentConfig) {
-                                        currentIndex = model.indexOf(_chatManager.currentConfig.type);
-                                        // On charge aussi la liste de modèles initiale
-                                        modelComboBox.model = _chatManager.modelsForProvider(_chatManager.currentConfig.type);
-                                    }
-                                }
+                                                 // 1. Mise à jour du type dans la config C++
+                                                 _chatManager.currentConfig.type = model[index];
+
+                                                 // 2. Mise à jour du modèle de la ComboBox des modèles
+                                                 modelComboBox.model = _chatManager.modelsForProvider(model[index]);
+
+                                                 // 3. Sélectionner le premier modèle par défaut
+                                                 if (modelComboBox.model.length > 0) {
+                                                     modelComboBox.currentIndex = 0;
+                                                     // Déclencher l'action pour que le C++ mette à jour le nom du modèle et l'URL
+                                                     modelComboBox.onActivated(0);
+                                                 }
+                                             }
+
                             }
 
                             // Nouvelle ComboBox pour le Modèle
-                            Label { text: "Model:" }
+                            Label { text: qsTr("Model:") }
                             ComboBox {
                                 id: modelComboBox
                                 Layout.fillWidth: true
-                                // Le modèle est rempli dynamiquement par la ComboBox du dessus
-
-                                // Quand on sélectionne un modèle, on met à jour toute la config
                                 onActivated: (index) => {
-                                    if (!_chatManager.currentConfig) return;
-                                    // On dit au C++ quel modèle a été choisi
-                                    _chatManager.updateConfigWithModel(model[index]);
-                                }
-
-                                // Initialisation
-                                Component.onCompleted: {
-                                    if (_chatManager.currentConfig) {
-                                        currentIndex = model.indexOf(_chatManager.currentConfig.modelName)
-                                    }
-                                }
+                                       if (!_chatManager.currentConfig) return;
+                                       // Synchronisation vers le C++ (met à jour modelName et endpointUrl)
+                                       _chatManager.updateConfigWithModel(model[index]);
+                                   }
                             }
 
                             // Clé API
@@ -456,7 +490,7 @@ ApplicationWindow {
                             RowLayout {
                                 Layout.alignment: Qt.AlignRight
                                 Button {
-                                    text: "Save Changes"
+                                    text: qsTr("Save Changes")
                                     highlighted: true
                                     onClicked: {
                                         if (_chatManager.saveConfig(_chatManager.currentConfig)) {

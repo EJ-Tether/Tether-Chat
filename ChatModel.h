@@ -7,12 +7,12 @@
 #include <QHash>
 #include <QFile>
 #include <QTextStream>
-#include <QJSEngine> // Pour QML_DECLARE_TYPE
-#include <QQmlEngine> // Pour QQmlEngine::registerUncreatableType
+#include <QJSEngine> // For QML_DECLARE_TYPE
+#include <QQmlEngine> // For QQmlEngine::registerUncreatableType
 
 #include "ChatMessage.h"
 #include "Interlocutor.h" // Ou DummyInterlocutor.h pour le debug
-
+#include "InterlocutorConfig.h"
 
 class ChatModel : public QAbstractListModel
 {
@@ -77,10 +77,10 @@ private slots:
     void onCurationUploadFailed(const QString &error);
 
 private:
-    void addMessage(const ChatMessage &message); // Ajoute un message au modèle et au fichier
+    void addMessage(const ChatMessage &message); // Add a message to the model *and* the jsonl live memory file
     void updateLiveMemoryEstimate();
     void checkCurationThreshold();
-    void triggerCuration(); // Placeholder pour la logique de curation
+    void triggerCuration();
     InterlocutorConfig *findCurrentConfig();
 
     QList<ChatMessage> m_messages;
