@@ -2,7 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-
+import QtQuick.Dialogs
 import Tether 1.0
 
 ApplicationWindow {
@@ -318,6 +318,85 @@ ApplicationWindow {
 
                                 onClicked: sendMessage()
                                 enabled: messageInput.text.trim().length > 0
+                            }
+                        }
+
+                        Frame {
+                            id: fileManagementArea
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 150
+                            Layout.topMargin: 5
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 5
+
+                                Label {
+                                    text: "Attached Files Library"
+                                    font.bold: true
+                                }
+
+                                ScrollView {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+
+                                    ListView {
+                                        id: fileListView
+                                        model: _chatManager.chatModel.managedFiles
+                                        spacing: 5
+
+                                        delegate: Frame {
+                                            width: parent.width
+                                            height: 30
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: 5
+                                                anchors.rightMargin: 5
+
+                                                BusyIndicator {
+                                                    running: model.status === ManagedFile.Uploading
+                                                    visible: running
+                                                }
+
+                                                Label {
+                                                    text: "✅"
+                                                    visible: model.status === ManagedFile.Ready
+                                                    font.pixelSize: 16
+                                                }
+
+                                                Label {
+                                                    text: model.fileName
+                                                    elide: Text.ElideRight
+                                                    Layout.fillWidth: true
+                                                }
+
+                                                Button {
+                                                    text: "✕"
+                                                    flat: true
+                                                    onClicked: {
+                                                        _chatManager.chatModel.deleteUserFile(index)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    text: "Add File..."
+                                    Layout.alignment: Qt.AlignRight
+                                    onClicked: fileDialog.open()
+                                }
+                            }
+
+                            // Le FileDialog est invisible, il ne s'ouvre que sur appel
+                            FileDialog {
+                                id: fileDialog
+                                title: "Please choose a file to attach"
+                                onAccepted: {
+                                    _chatManager.chatModel.uploadUserFile(fileDialog.selectedFile)
+                                }
                             }
                         }
                     }

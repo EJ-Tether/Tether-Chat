@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Settings", "Cannot create Settings in QML.");
     // Pas besoin d'enregistrer ChatMessage s'il n'est utilisé que dans le modèle
     qmlRegisterType<InterlocutorConfig>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "InterlocutorConfig");
-
+    qmlRegisterType<ManagedFile>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ManagedFile");
 
     // --- Création des objets principaux ---
 

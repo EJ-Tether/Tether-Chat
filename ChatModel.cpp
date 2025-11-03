@@ -24,11 +24,18 @@ ChatModel::ChatModel(QObject *parent)
                 &Interlocutor::errorOccurred,
                 this,
                 &ChatModel::handleInterlocutorError);
+        connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
+        connect(m_interlocutor,
+                &Interlocutor::fileUploadFailed,
+                this,
+                &ChatModel::onFileUploadFailed);
+        connect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted);
     }
 }
 
 ChatModel::~ChatModel()
 {
+    saveManagedFiles();
     saveChat(); // Sauvegarder la conversation à la fermeture si nécessaire
 }
 
@@ -87,6 +94,8 @@ void ChatModel::sendMessage(const QString &messageText)
         return;
     }
 
+    QStringList allAttachments;
+
     // 1. Ajouter le message de l'utilisateur au modèle
     // Note: les tokens de ce message seront déterminés par la réponse de l'API
     ChatMessage userMessage(true,
@@ -96,6 +105,15 @@ void ChatModel::sendMessage(const QString &messageText)
                             0,
                             "user");
     addMessage(userMessage);
+
+    // 2. Ajouter les fichiers utilisateur qui sont prêts
+    for (ManagedFile *file : m_managedFiles) {
+        if (file->status() == ManagedFile::Ready && !file->fileId().isEmpty()) {
+            allAttachments.append(file->fileId());
+        }
+    }
+
+    m_interlocutor->sendRequest(m_messages, allAttachments);
 
     // 3. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
     InterlocutorConfig *config
@@ -108,7 +126,7 @@ void ChatModel::sendMessage(const QString &messageText)
     // On envoie la requête avec l'historique ET la pièce jointe
     m_interlocutor->sendRequest(m_messages, attachments);
 
-    // 2. Gérer la logique de l'indicateur d'attente de réponse
+    // 4. Gérer la logique de l'indicateur d'attente de réponse
     setWaitingForReply(true);
 
     // Ajouter un message spécial "indicateur d'attente"
@@ -146,7 +164,7 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
             if (config && !config->ancientMemoryFileId().isEmpty()) {
                 m_oldAncientMemoryFileIdToDelete = config->ancientMemoryFileId();
             }
-            m_interlocutor->uploadFile(newSummary.toUtf8(), "assistants");
+            m_interlocutor->uploadFile(newSummary.toUtf8(), "curation_ancient_memory");
             qDebug() << "Older memory successfully updated.";
             emit curationFinished(true);
         } else {
@@ -284,6 +302,10 @@ void ChatModel::loadChat(const QString &filePath)
     m_messages.clear();
     m_liveMemoryTokens = 0;    // Réinitialiser
     m_cumulativeTokenCost = 0; // Réinitialiser
+    // Vider les anciennes listes
+    qDeleteAll(m_managedFiles);
+    m_managedFiles.clear();
+    m_messages.clear();
 
     if (filePath.isEmpty()) {
         qDebug() << "No file path provided to load chat. Starting with an empty chat.";
@@ -326,6 +348,8 @@ void ChatModel::loadChat(const QString &filePath)
     updateLiveMemoryEstimate();
     emit cumulativeTokenCostChanged();
     m_currentChatFilePath = filePath;
+    loadManagedFiles(); // Charger la liste des fichiers associés
+
     endResetModel();
 
     emit currentChatFilePathChanged();
@@ -532,13 +556,9 @@ void ChatModel::triggerCuration()
 
     qDebug() << "Step 1/4: Uploading live memory for curation...";
     // On connecte un slot spécifique pour cette étape
-    connect(m_interlocutor,
-            &Interlocutor::fileUploaded,
-            this,
-            &ChatModel::onLiveMemoryUploadedForCuration,
-            Qt::SingleShotConnection);
-    m_interlocutor->uploadFile(conversationToSummarize.toUtf8(),
-                               "assistants"); // "assistants" est le 'purpose' pour OpenAI
+    qDebug() << "Step 1/4: Uploading live memory for curation...";
+    // On donne un "purpose" spécifique pour que le slot `onFileUploaded` sache quoi faire
+    m_interlocutor->uploadFile(conversationToSummarize.toUtf8(), "curation_live_memory");
 }
 
 InterlocutorConfig *ChatModel::findCurrentConfig() {
@@ -552,11 +572,8 @@ InterlocutorConfig *ChatModel::findCurrentConfig() {
     return nullptr;
 }
 
-void ChatModel::onLiveMemoryUploadedForCuration(const QString &fileId, const QString &purpose)
+void ChatModel::onLiveMemoryUploadedForCuration(const QString &fileId)
 {
-    if (purpose != "assistants")
-        return; // S'assurer que c'est le bon signal
-
     qDebug() << "Step 2/4: Live memory uploaded (ID:" << fileId << "). Sending curation request...";
     m_liveMemoryFileIdForCuration = fileId; // On stocke l'ID pour pouvoir le supprimer plus tard
 
@@ -622,10 +639,8 @@ void ChatModel::saveOlderMemory(const QString &content)
     out << content;
 }
 
-void ChatModel::onNewAncientMemoryUploaded(const QString &newFileId, const QString &purpose)
+void ChatModel::onNewAncientMemoryUploaded(const QString &newFileId)
 {
-    if (purpose != "assistants")
-        return;
     qDebug() << "New ancient memory uploaded (ID:" << newFileId << "). Updating config...";
 
     // Mettre à jour la config avec le nouvel ID
@@ -660,4 +675,157 @@ void ChatModel::onCurationUploadFailed(const QString &error)
     m_isCurationInProgress = false;
     m_isWaitingForCurationResponse = false;
 }
+
+QList<QObject *> ChatModel::managedFiles() const
+{
+    QList<QObject *> list;
+    for (ManagedFile *file : m_managedFiles) {
+        list.append(file);
+    }
+    return list;
+}
+
+void ChatModel::uploadUserFile(const QUrl &fileUrl)
+{
+    if (!m_interlocutor)
+        return;
+
+    QFile file(fileUrl.toLocalFile());
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Could not open file for upload:" << fileUrl.toLocalFile();
+        return;
+    }
+    QByteArray content = file.readAll();
+
+    // 1. Ajouter immédiatement à la liste avec le statut "Uploading"
+    ManagedFile *newFile = new ManagedFile(fileUrl.fileName(), this);
+    m_managedFiles.append(newFile);
+    emit managedFilesChanged();
+
+    // 2. Lancer l'upload
+    // On passe un "purpose" spécial pour les fichiers utilisateur
+    m_interlocutor->uploadFile(content, "user_attachment");
+}
+
+void ChatModel::deleteUserFile(int index)
+{
+    if (index < 0 || index >= m_managedFiles.size())
+        return;
+
+    ManagedFile *fileToDelete = m_managedFiles.at(index);
+    if (!fileToDelete->fileId().isEmpty()) {
+        m_interlocutor->deleteFile(fileToDelete->fileId());
+    }
+
+    m_managedFiles.removeAt(index);
+    saveManagedFiles(); // SAUVEGARDER la liste après une suppression !
+
+    emit managedFilesChanged();
+    fileToDelete->deleteLater();
+}
+
+// Slot qui gère la fin de l'upload
+void ChatModel::onFileUploaded(const QString &fileId, const QString &purpose)
+{
+    // --- Logique de tri ---
+    if (purpose == "user_attachment") {
+        // C'est un fichier uploadé par l'utilisateur.
+        qDebug() << "User file uploaded successfully. ID:" << fileId;
+        for (int i = m_managedFiles.size() - 1; i >= 0; --i) {
+            if (m_managedFiles[i]->status() == ManagedFile::Uploading) {
+                m_managedFiles[i]->setFileId(fileId);
+                m_managedFiles[i]->setStatus(ManagedFile::Ready);
+                return; // On a trouvé et mis à jour le bon fichier
+            }
+        }
+        saveManagedFiles(); // SAUVEGARDER la liste après un upload réussi !
+
+    } else if (purpose == "curation_live_memory") {
+        // Étape 1 de la curation : la mémoire vive est uploadée
+        onLiveMemoryUploadedForCuration(fileId); // On appelle une fonction privée pour la suite
+    } else if (purpose == "curation_ancient_memory") {
+        // Étape finale de la curation : la nouvelle mémoire ancienne est uploadée
+        onNewAncientMemoryUploaded(fileId); // On appelle une autre fonction privée pour la suite
+    }
+}
+
+void ChatModel::onFileDeleted(const QString &fileId, bool success)
+{
+    // Ici, c'est principalement pour la fin de la curation
+    if (!m_oldAncientMemoryFileIdToDelete.isEmpty() && fileId == m_oldAncientMemoryFileIdToDelete) {
+        onOldAncientMemoryDeleted(fileId, success);
+    }
+    // On pourrait aussi ajouter une logique si la suppression d'un fichier utilisateur échoue
+}
+
+void ChatModel::onFileUploadFailed(const QString &error)
+{
+    // On doit savoir quel upload a échoué. On peut se baser sur les flags d'état.
+    if (m_isCurationInProgress) {
+        onCurationUploadFailed(error);
+    } else {
+        // C'était probablement un fichier utilisateur
+        qWarning() << "User file upload failed:" << error;
+        // On cherche le dernier fichier en "Uploading" pour le passer en "Error"
+        for (int i = m_managedFiles.size() - 1; i >= 0; --i) {
+            if (m_managedFiles[i]->status() == ManagedFile::Uploading) {
+                m_managedFiles[i]->setStatus(ManagedFile::Error);
+                break;
+            }
+        }
+    }
+}
+
+QString ChatModel::getManagedFilesPath() const
+{
+    if (m_currentChatFilePath.isEmpty())
+        return "";
+    QFileInfo fileInfo(m_currentChatFilePath);
+    return fileInfo.path() + "/" + fileInfo.baseName() + "_files.json";
+}
+
+void ChatModel::loadManagedFiles()
+{
+    QString path = getManagedFilesPath();
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return; // Pas de fichier, pas de problème
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonArray fileArray = doc.array();
+
+    for (const QJsonValue &value : fileArray) {
+        ManagedFile *managedFile = ManagedFile::fromJsonObject(value.toObject(), this);
+        m_managedFiles.append(managedFile);
+    }
+
+    emit managedFilesChanged();
+    qDebug() << "Loaded" << m_managedFiles.count() << "managed files for this chat.";
+}
+
+void ChatModel::saveManagedFiles() const
+{
+    QString path = getManagedFilesPath();
+    if (path.isEmpty())
+        return;
+
+    QJsonArray fileArray;
+    for (const ManagedFile *file : m_managedFiles) {
+        // On ne sauvegarde que les fichiers qui sont prêts et uploadés
+        if (file->status() == ManagedFile::Ready) {
+            fileArray.append(file->toJsonObject());
+        }
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qWarning() << "Could not open file list for writing:" << path;
+        return;
+    }
+    file.write(QJsonDocument(fileArray).toJson(QJsonDocument::Indented));
+}
+
 // End Source File: ChatModel.cpp

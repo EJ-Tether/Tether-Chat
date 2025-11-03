@@ -13,6 +13,7 @@
 #include "ChatMessage.h"
 #include "Interlocutor.h" // Ou DummyInterlocutor.h pour le debug
 #include "InterlocutorConfig.h"
+#include "ManagedFile.h"
 
 class ChatModel : public QAbstractListModel
 {
@@ -63,6 +64,11 @@ public:
     Q_PROPERTY(bool isWaitingForReply READ isWaitingForReply NOTIFY isWaitingForReplyChanged)
     bool isWaitingForReply() const { return m_isWaitingForReply; }
 
+    Q_PROPERTY(QList<QObject *> managedFiles READ managedFiles NOTIFY managedFilesChanged)
+    QList<QObject *> managedFiles() const;
+    Q_INVOKABLE void uploadUserFile(const QUrl &fileUrl);
+    Q_INVOKABLE void deleteUserFile(int index);
+
 signals:
     void currentChatFilePathChanged();
     void liveMemoryTokensChanged();
@@ -72,14 +78,16 @@ signals:
     void curationNeeded(); // Signal pour indiquer qu'une curation est nécessaire
     void curationFinished(bool success); // Signal utile pour notifier l'UI
     void isWaitingForReplyChanged();
+    void managedFilesChanged();
 
 private slots:
     void handleInterlocutorResponse(const QJsonObject &response);
     void handleInterlocutorError(const QString &error);
-    void onLiveMemoryUploadedForCuration(const QString &fileId, const QString &purpose);
-    void onNewAncientMemoryUploaded(const QString &newFileId, const QString &purpose);
-    void onOldAncientMemoryDeleted(const QString &fileId, bool success);
-    void onCurationUploadFailed(const QString &error);
+    //void onUserFileUploaded(const QString &fileId, const QString &purpose);
+    //void onUserFileUploadFailed(const QString &error);
+    void onFileUploaded(const QString &fileId, const QString &purpose);
+    void onFileDeleted(const QString &fileId, bool success);
+    void onFileUploadFailed(const QString &error);
 
 private:
     void addMessage(const ChatMessage &message); // Add a message to the model *and* the jsonl live memory file
@@ -87,6 +95,14 @@ private:
     void checkCurationThreshold();
     void triggerCuration();
     InterlocutorConfig *findCurrentConfig();
+    void onLiveMemoryUploadedForCuration(const QString &fileId);
+    void onNewAncientMemoryUploaded(const QString &newFileId);
+    void onOldAncientMemoryDeleted(const QString &fileId, bool success);
+    void onCurationUploadFailed(const QString &error);
+
+    void loadManagedFiles();
+    void saveManagedFiles() const;
+    QString getManagedFilesPath() const;
 
     QList<ChatMessage> m_messages;
     Interlocutor *m_interlocutor; // L'interlocuteur réel ou bidon
@@ -114,6 +130,8 @@ private:
     // Code pour gérer l'état d'attente de réponse
     void setWaitingForReply(bool waiting); // Setter privé pour gérer l'état
     bool m_isWaitingForReply = false;
+
+    QList<ManagedFile *> m_managedFiles;
 };
 
 #endif // CHATMODEL_H
