@@ -426,7 +426,7 @@ void ChatModel::updateLiveMemoryEstimate()
 
 void ChatModel::checkCurationThreshold()
 {
-    // On utilise maintenant la bonne variable
+    qDebug()<<"There are currently"<<m_liveMemoryTokens<<"in the live memory";
     if (m_liveMemoryTokens >= CURATION_TRIGGER_TOKENS && !m_isCurationInProgress) {
         qDebug() << "Curation threshold reached! Live memory size:" << m_liveMemoryTokens;
         emit curationNeeded();

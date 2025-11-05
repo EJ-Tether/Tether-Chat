@@ -85,3 +85,4 @@ void InterlocutorConfig::write(QJsonObject &json) const {
     json["systemPrompt"] = m_systemPrompt;
     json["modelName"] = m_modelName;
 }
+// End source file InterlocutorConfig.cpp

@@ -1,3 +1,4 @@
+// Begin source file InterlocutorConfig.h
 #ifndef INTERLOCUTORCONFIG_H
 #define INTERLOCUTORCONFIG_H
 
@@ -65,3 +66,4 @@ private:
 };
 
 #endif // INTERLOCUTORCONFIG_H
+// End source file InterlocutorConfig.h

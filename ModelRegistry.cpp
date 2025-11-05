@@ -1,3 +1,4 @@
+// Begin source file ModelRegistry.cpp
 #include "ModelRegistry.h"
 
 ModelRegistry::ModelRegistry(QObject *parent) : QObject(parent) {
@@ -47,3 +48,4 @@ ModelInfo ModelRegistry::findModel(const QString &displayName) const {
     }
     return {}; // Retourne une structure vide si non trouvé
 }
+// End source file ModelRegistry.cpp

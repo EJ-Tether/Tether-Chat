@@ -1,3 +1,4 @@
+// Begin source file Modelinfo.h
 #ifndef MODELINFO_H
 #define MODELINFO_H
 
@@ -11,3 +12,4 @@ struct ModelInfo {
 };
 
 #endif // MODELINFO_H
+// End source file Modelinfo.h

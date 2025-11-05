@@ -172,3 +172,4 @@ void OpenAIInterlocutor::deleteFile(const QString &fileId)
         reply->deleteLater();
     });
 }
+// End source file OpenAIInterlocutor.cpp

@@ -1,3 +1,4 @@
+// Begin source file ModelRegistry
 #ifndef MODELREGISTRY_H
 #define MODELREGISTRY_H
 
@@ -27,3 +28,4 @@ private:
 };
 
 #endif // MODELREGISTRY_H
+// End source file ModelRegistry

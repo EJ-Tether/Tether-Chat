@@ -454,7 +454,7 @@ ApplicationWindow {
                             id: configListView
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            model: _chatManager.interlocutorNames
+                            model: _chatManager? _chatManager.interlocutorNames : ""
                             currentIndex: -1
 
                             delegate: ItemDelegate {
@@ -493,22 +493,19 @@ ApplicationWindow {
                         function onCurrentConfigChanged() {
                             if (!_chatManager.currentConfig) return;
 
-                            // 1. Mettre à jour la ComboBox des fournisseurs
+                            // 1. Provider
                             providerComboBox.currentIndex = providerComboBox.model.indexOf(_chatManager.currentConfig.type);
 
-                            // 2. Mettre à jour le modèle de la ComboBox des modèles
+                            // 2. Models (on met à jour le modèle AVANT de chercher l'index)
                             var provider = _chatManager.currentConfig.type;
                             if (provider) {
                                 modelComboBox.model = _chatManager.modelsForProvider(provider);
-                            } else {
-                                modelComboBox.model = []; // Vider si pas de provider
-                            }
-
-                            // 3. Mettre à jour la sélection de la ComboBox des modèles
-                            // On utilise Qt.callLater pour laisser le temps au modèle de se mettre à jour
-                            Qt.callLater(function() {
+                                // MAINTENANT on peut chercher l'index dans le BON modèle
                                 modelComboBox.currentIndex = modelComboBox.model.indexOf(_chatManager.currentConfig.modelName);
-                            });
+                            } else {
+                                modelComboBox.model = [];
+                                modelComboBox.currentIndex = -1;
+                            }
                         }
                     }
 
