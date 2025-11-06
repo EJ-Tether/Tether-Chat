@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
         engine.retranslate();
     });
 
+
     // --- Démarrage de l'engine QML ---
     QObject::connect(
         &engine,

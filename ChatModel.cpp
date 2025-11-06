@@ -198,6 +198,7 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
             QJsonObject firstChoice = choicesArray[0].toObject();
             if (firstChoice.contains("message") && firstChoice["message"].isObject()) {
                 QJsonObject message = firstChoice["message"].toObject();
+                qDebug()<<"Objet JSON reçu:"<<message;
                 if (message.contains("content")) {
                     aiResponseText = message["content"].toString();
                 }

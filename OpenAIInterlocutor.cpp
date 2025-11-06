@@ -86,6 +86,8 @@ void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
     // Pour le streaming, si vous l'implémentez plus tard :
     // payload["stream"] = true;
 
+    qDebug()<<"Sending JSON"<<payload;
+
     QByteArray data = QJsonDocument(payload).toJson();
     QNetworkReply *reply = m_manager->post(request, data);
 
@@ -133,6 +135,7 @@ void OpenAIInterlocutor::uploadFile(const QByteArray &content, const QString &pu
     connect(reply, &QNetworkReply::finished, this, [this, reply, purpose]() {
         if (reply->error() == QNetworkReply::NoError) {
             QJsonObject response = QJsonDocument::fromJson(reply->readAll()).object();
+            qDebug()<<"JSON Response"<<response;
             QString fileId = response["id"].toString();
             if (!fileId.isEmpty()) {
                 qDebug() << "File uploaded successfully. ID:" << fileId;
