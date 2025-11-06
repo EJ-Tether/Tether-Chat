@@ -355,13 +355,13 @@ ApplicationWindow {
                                                 anchors.rightMargin: 5
 
                                                 BusyIndicator {
-                                                    running: model.status === ManagedFile.Uploading
+                                                    running: model.status === 0 // ManagedFile.Uploading
                                                     visible: running
                                                 }
 
                                                 Label {
                                                     text: "✅"
-                                                    visible: model.status === ManagedFile.Ready
+                                                    visible: model.status === 1 // ManagedFile.Ready
                                                     font.pixelSize: 16
                                                 }
 

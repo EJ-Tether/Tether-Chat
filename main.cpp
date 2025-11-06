@@ -2,8 +2,9 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include "InterlocutorConfig.h"
 #include "ChatManager.h" // Inclure le nouveau manager
+#include "InterlocutorConfig.h"
+#include "ManagedFile.h"
 #include "settings.h"
 
 #define APP_NAME "TetherChat"
@@ -25,6 +26,12 @@ int main(int argc, char *argv[])
     // Pas besoin d'enregistrer ChatMessage s'il n'est utilisé que dans le modèle
     qmlRegisterType<InterlocutorConfig>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "InterlocutorConfig");
     qmlRegisterType<ManagedFile>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ManagedFile");
+    qmlRegisterUncreatableMetaObject(ManagedFile::staticMetaObject,
+                                     APP_NAME,
+                                     MAJOR_VERSION,
+                                     MINOR_VERSION,
+                                     "ManagedFile",
+                                     "Cannot create ManagedFile in QML, only expose enums");
 
     // --- Création des objets principaux ---
 

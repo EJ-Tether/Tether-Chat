@@ -1,3 +1,4 @@
+// Begin of source file ManagedFile.h
 #ifndef MANAGEDFILE_H
 #define MANAGEDFILE_H
 
@@ -13,7 +14,7 @@ class ManagedFile : public QObject
     Q_PROPERTY(Status status READ status WRITE setStatus NOTIFY statusChanged)
 
 public:
-    enum Status { Uploading, Ready, Error };
+    enum Status { Uploading = 0, Ready = 1, Error = 2 };
     Q_ENUM(Status)
 
     explicit ManagedFile(const QString &fileName, QObject *parent = nullptr);
@@ -37,3 +38,4 @@ private:
 };
 
 #endif // MANAGEDFILE_H
+// End of source file ManagedFile.h
