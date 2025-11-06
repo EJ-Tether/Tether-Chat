@@ -13,11 +13,7 @@ class ManagedFile : public QObject
     Q_PROPERTY(Status status READ status WRITE setStatus NOTIFY statusChanged)
 
 public:
-    enum Status {
-        Uploading,
-        Ready,
-        Error
-    };
+    enum Status { Uploading, Ready, Error };
     Q_ENUM(Status)
 
     explicit ManagedFile(const QString &fileName, QObject *parent = nullptr);

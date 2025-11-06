@@ -19,9 +19,11 @@ public:
 
     void uploadFile(const QByteArray &content, const QString &purpose) override {
         qDebug()<<"DummyInterlocutor::uploadFile:"<<content<<purpose;
+        emit fileUploaded("dummy_id", "user_attachment");
     }
     void deleteFile(const QString &fileId) override {
         qDebug()<<"DummyInterlocutor::deleteFile:"<<fileId;
+        emit fileDeleted("dummy_id", true);
     }
 
 

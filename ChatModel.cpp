@@ -446,10 +446,7 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
                    &Interlocutor::errorOccurred,
                    this,
                    &ChatModel::handleInterlocutorError);
-        disconnect(m_interlocutor,
-                   &Interlocutor::fileUploaded,
-                   this,
-                   &ChatModel::onNewAncientMemoryUploaded);
+        disconnect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
         disconnect(m_interlocutor,
                    &Interlocutor::fileUploadFailed,
                    this,
@@ -687,6 +684,7 @@ QList<QObject *> ChatModel::managedFiles() const
 
 void ChatModel::uploadUserFile(const QUrl &fileUrl)
 {
+    qDebug() << "uploadUserFile: fileUrl=" << fileUrl;
     if (!m_interlocutor)
         return;
 
@@ -727,6 +725,7 @@ void ChatModel::deleteUserFile(int index)
 // Slot qui gère la fin de l'upload
 void ChatModel::onFileUploaded(const QString &fileId, const QString &purpose)
 {
+    qDebug() << "onFileUploaded: fileId=" << fileId << "purpose=" << purpose;
     // --- Logique de tri ---
     if (purpose == "user_attachment") {
         // C'est un fichier uploadé par l'utilisateur.
@@ -739,7 +738,6 @@ void ChatModel::onFileUploaded(const QString &fileId, const QString &purpose)
             }
         }
         saveManagedFiles(); // SAUVEGARDER la liste après un upload réussi !
-
     } else if (purpose == "curation_live_memory") {
         // Étape 1 de la curation : la mémoire vive est uploadée
         onLiveMemoryUploadedForCuration(fileId); // On appelle une fonction privée pour la suite

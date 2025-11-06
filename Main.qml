@@ -395,7 +395,7 @@ ApplicationWindow {
                                 id: fileDialog
                                 title: "Please choose a file to attach"
                                 onAccepted: {
-                                    _chatManager.chatModel.uploadUserFile(fileDialog.selectedFile)
+                                    _chatManager.chatModel.uploadUserFile(fileDialog.currentFile)
                                 }
                             }
                         }
@@ -606,7 +606,7 @@ ApplicationWindow {
                                 id: systemPromptArea
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 200
-                                text: _chatManager.currentConfig ? _chatManager.currentConfig.systemPrompt : ""
+                                text: _chatManager && _chatManager.currentConfig ? _chatManager.currentConfig.systemPrompt : ""
                                 placeholderText: "You are a helpful assistant..."
                                 wrapMode: Text.Wrap
                                 onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.systemPrompt = text
