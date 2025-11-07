@@ -59,7 +59,7 @@ public:
 
 signals:
     void interlocutorNamesChanged();
-    void activeInterlocutorNameChanged();
+    void activeInterlocutorNameChanged(QString &name);
     void currentConfigChanged();
 
 private:

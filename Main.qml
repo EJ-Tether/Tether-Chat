@@ -174,6 +174,10 @@ ApplicationWindow {
                                 function onModelReset() { Qt.callLater(_messageListView.positionViewAtEnd); }
                                 function onChatMessageAdded() { _messageListView.positionViewAtEnd(); }
                             }
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AsNeeded
+                            }
+
                             delegate: Item {
                                 id: _singleMessageArea
                                 // _singleMessageArea : is the invisible rectangle occupying the full

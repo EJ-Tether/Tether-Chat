@@ -94,7 +94,7 @@ void ChatModel::sendMessage(const QString &messageText)
         return;
     }
 
-    QStringList allAttachments;
+    QStringList userAttachments;
 
     // 1. Ajouter le message de l'utilisateur au modèle
     // Note: les tokens de ce message seront déterminés par la réponse de l'API
@@ -109,22 +109,12 @@ void ChatModel::sendMessage(const QString &messageText)
     // 2. Ajouter les fichiers utilisateur qui sont prêts
     for (ManagedFile *file : m_managedFiles) {
         if (file->status() == ManagedFile::Ready && !file->fileId().isEmpty()) {
-            allAttachments.append(file->fileId());
+            userAttachments.append(file->fileId());
         }
     }
 
-    m_interlocutor->sendRequest(m_messages, allAttachments);
-
-    // 3. Envoyer L'INTÉGRALITÉ de l'historique à l'interlocuteur
-    InterlocutorConfig *config
-        = findCurrentConfig(); // Vous aurez besoin d'une fonction pour ça via ChatManager
-    QStringList attachments;
-    if (config && !config->ancientMemoryFileId().isEmpty()) {
-        attachments.append(config->ancientMemoryFileId());
-    }
-
     // On envoie la requête avec l'historique ET la pièce jointe
-    m_interlocutor->sendRequest(m_messages, attachments);
+    m_interlocutor->sendRequest(m_messages, userAttachments);
 
     // 4. Gérer la logique de l'indicateur d'attente de réponse
     setWaitingForReply(true);

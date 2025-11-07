@@ -36,6 +36,11 @@ void OpenAIInterlocutor::setSystemPrompt(const QString &systemPrompt)
 void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
                                      const QStringList &attachmentFileIds)
 {
+    QStringList allAttachments = attachmentFileIds;
+    if (!m_ancientMemoryFileId.isEmpty()) {
+        allAttachments.append(m_ancientMemoryFileId);
+    }
+
     QNetworkRequest request(m_url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
@@ -63,9 +68,9 @@ void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
         QJsonObject lastUserMessage = messagesArray.last().toObject();
         messagesArray.removeLast(); // On le retire pour le modifier
 
-        if (!attachmentFileIds.isEmpty()) {
+        if (!allAttachments.isEmpty()) {
             QJsonArray attachmentsArray;
-            for (const QString &fileId : attachmentFileIds) {
+            for (const QString &fileId : allAttachments) {
                 QJsonObject attachment;
                 attachment["file_id"] = fileId;
                 // Le "tool" pour les pièces jointes standard est "file_search" (anciennement "retrieval")

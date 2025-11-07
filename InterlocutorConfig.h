@@ -43,7 +43,7 @@ public:
     QString modelName() const;
     void setModelName(const QString &modelName);
 
-    QString ancientMemoryFileId() const;
+    QString ancientMemoryFileId();
     void setAncientMemoryFileId(const QString &fileId);
 
 signals:

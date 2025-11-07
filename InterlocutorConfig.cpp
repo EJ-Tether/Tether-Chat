@@ -55,10 +55,11 @@ void InterlocutorConfig::setModelName(const QString &modelName)
     }
 }
 
-QString InterlocutorConfig::ancientMemoryFileId() const
+QString InterlocutorConfig::ancientMemoryFileId()
 {
     return m_ancientMemoryFileId;
 }
+
 void InterlocutorConfig::setAncientMemoryFileId(const QString &ancientMemoryFileId)
 {
     if (m_ancientMemoryFileId != ancientMemoryFileId) {

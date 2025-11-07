@@ -23,6 +23,7 @@ public:
     virtual void uploadFile(const QByteArray &content, const QString &purpose) = 0;
     virtual void deleteFile(const QString &fileId) = 0;
     virtual void setSystemPrompt(const QString &systemPrompt) {}
+    void setAncientMemoryFileId(QString fileId) { m_ancientMemoryFileId = fileId; }
 
 signals:
     void responseReceived(const QJsonObject &response);
@@ -31,12 +32,14 @@ signals:
     void fileDeleted(const QString &fileId, bool success);
     void fileUploadFailed(const QString &error);
 
-private:
+protected:
     // m_interlocutorName: That's the name that the user entered in the 'configuration' tab.
     // Important for:
     //   (1) naming the jsonl file of the current discussion and the other informations
     //   (2) being displayed in the combo box for chosing the current interlocutor
     QString m_interlocutorName;
+    QString m_ancientMemoryFileId;
+
 };
 
 #endif // INTERLOCUTOR_H

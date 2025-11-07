@@ -30,9 +30,7 @@ ChatManager::ChatManager(QObject *parent)
         saveConfig(m_currentConfig);
     }
 
-    // Activer le premier interlocuteur de la liste
-    // TODO : Plus tard: activer le dernier interlocuteur courant (qui sera sauvegardé dans le .settings)
-    if (!m_interlocutors.isEmpty()) {
+    if (m_activeInterlocutorName.isEmpty() && !m_interlocutors.isEmpty()) {
         switchToInterlocutor(m_interlocutors.firstKey());
     }
 }
@@ -78,7 +76,7 @@ void ChatManager::switchToInterlocutor(const QString &name)
     m_chatModel->loadChat(chatFilePath);
 
     m_activeInterlocutorName = name;
-    emit activeInterlocutorNameChanged();
+    emit activeInterlocutorNameChanged(m_activeInterlocutorName);
 }
 
 InterlocutorConfig *ChatManager::currentConfig() const
@@ -223,27 +221,32 @@ void ChatManager::updateConfigWithModel(const QString &modelDisplayName)
 Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *config)
 {
     ModelInfo model = m_modelRegistry.findModel(config->modelName());
+    Interlocutor* interlocutor = nullptr;
 
     // On utilise maintenant model.provider au lieu de config->type()
     if (model.provider == "OpenAI") {
-        return new OpenAIInterlocutor(config->name(),
+        interlocutor = new OpenAIInterlocutor(config->name(),
                                       config->apiKey(),
                                       QUrl(config->endpointUrl()),
                                       model.internalName, // On passe le nom interne !
                                       this);
-    }
-    if (model.provider == "Google") {
-        return new GoogleAIInterlocutor(config->name(),
+    } else if (model.provider == "Google") {
+        interlocutor = new GoogleAIInterlocutor(config->name(),
                                         config->apiKey(),
                                         QUrl(config->endpointUrl()),
                                         this);
-    }
-    if (config->type() == "Dummy") {
-        return new DummyInterlocutor(config->name(), this);
-    }
+    } else if (config->type() == "Dummy") {
+        interlocutor = new DummyInterlocutor(config->name(), this);
+    } else {
 
-    qWarning() << "Unknown interlocutor type:" << config->type()
-               << ". Creating a Dummy as fallback.";
-    return new DummyInterlocutor(config->name(), this);
+        qWarning() << "Unknown interlocutor type:" << config->type()
+                   << ". Creating a Dummy as fallback.";
+        interlocutor = new DummyInterlocutor(config->name(), this);
+    }
+    if (interlocutor) {
+        interlocutor->setSystemPrompt(config->systemPrompt());
+        interlocutor->setAncientMemoryFileId(config->ancientMemoryFileId());
+    }
+    return interlocutor;
 }
 // End source file ChatManager.cpp

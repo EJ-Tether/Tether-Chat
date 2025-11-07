@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QTimer>
 #include "ChatManager.h" // Inclure le nouveau manager
 #include "InterlocutorConfig.h"
 #include "ManagedFile.h"
@@ -14,6 +15,9 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+
+    app.setOrganizationName("EJ-Tether"); // Remplace par ton nom ou un pseudo
+    app.setApplicationName("Tether");
 
     qputenv("QT_QUICK_CONTROLS_STYLE", "Material");
     QGuiApplication::setApplicationName("TetherChat");
@@ -35,18 +39,33 @@ int main(int argc, char *argv[])
 
     // --- Création des objets principaux ---
 
-    // 1. Le ChatManager est le point d'entrée principal
+    // 1. Créer l'objet Settings d'abord
+    Settings settings;
+    engine.rootContext()->setContextProperty("_settings", &settings);
+
+    // 2. Le ChatManager est le point d'entrée principal
     ChatManager chatManager;
     engine.rootContext()->setContextProperty("_chatManager", &chatManager);
 
-    // 2. L'objet Settings pour la configuration
-    Settings settings;
-    engine.rootContext()->setContextProperty("_settings", &settings);
 
     QObject::connect(&settings, &Settings::retranslate, &app, [&engine, &settings]() {
         engine.retranslate();
     });
 
+    // Quand l'interlocuteur actif du ChatManager change, on le dit à Settings pour qu'il le sauvegarde.
+    QObject::connect(&chatManager, &ChatManager::activeInterlocutorNameChanged,
+                     &settings, &Settings::setLastUsedInterlocutor);
+
+    // 4. Utiliser la valeur de Settings pour initialiser ChatManager
+    // On demande à settings quel était le dernier interlocuteur utilisé.
+    QString lastInterlocutor = settings.lastUsedInterlocutor();
+    if (!lastInterlocutor.isEmpty()) {
+        // Si on en a un, on dit au ChatManager de s'activer dessus.
+        // On utilise QTimer::singleShot pour s'assurer que l'UI est prête avant de faire le switch.
+        QTimer::singleShot(0, &chatManager, [lastInterlocutor, &chatManager](){
+            chatManager.switchToInterlocutor(lastInterlocutor);
+        });
+    }
 
     // --- Démarrage de l'engine QML ---
     QObject::connect(
