@@ -19,11 +19,19 @@ public:
 
     void uploadFile(const QByteArray &content, const QString &purpose) override {
         qDebug()<<"DummyInterlocutor::uploadFile:"<<content<<purpose;
-        emit fileUploaded("dummy_id", "user_attachment");
+        QTimer::singleShot(900, this, [this, purpose]() {
+            qDebug() << "DummyInterlocutor: Upload finished.";
+            // On émet le signal APRÈS le délai
+            emit fileUploaded("dummy_id_" + QString::number(qrand()), purpose);
+        });
     }
     void deleteFile(const QString &fileId) override {
         qDebug()<<"DummyInterlocutor::deleteFile:"<<fileId;
-        emit fileDeleted("dummy_id", true);
+        QTimer::singleShot(900, this, [this, purpose]() {
+            qDebug() << "DummyInterlocutor: Upload finished.";
+            // On émet le signal APRÈS le délai
+            emit fileDeleted(fileId, purpose);
+        });
     }
 
 

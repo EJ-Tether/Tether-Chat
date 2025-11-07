@@ -1,9 +1,18 @@
 #include "ManagedFile.h"
+#include "QDebug"
 
 ManagedFile::ManagedFile(const QString &fileName, QObject *parent)
-    : QObject(parent), m_fileName(fileName), m_status(Uploading) {}
+    : QObject(parent)
+    , m_fileName(fileName)
+    , m_status(Uploading)
+{
+    qDebug() << "ManagedFile::ManagedFile" << fileName;
+}
 
-QString ManagedFile::fileName() const { return m_fileName; }
+QString ManagedFile::fileName() const
+{
+    return m_fileName;
+}
 QString ManagedFile::fileId() const { return m_fileId; }
 void ManagedFile::setFileId(const QString &id) {
     if (m_fileId != id) {
