@@ -441,11 +441,8 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
         disconnect(m_interlocutor,
                    &Interlocutor::fileUploadFailed,
                    this,
-                   &ChatModel::onCurationUploadFailed);
-        disconnect(m_interlocutor,
-                   &Interlocutor::fileDeleted,
-                   this,
-                   &ChatModel::onOldAncientMemoryDeleted);
+                   &ChatModel::onFileUploadFailed);
+        disconnect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted);
     }
 
     m_interlocutor = interlocutor;
@@ -460,18 +457,12 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
                 &Interlocutor::errorOccurred,
                 this,
                 &ChatModel::handleInterlocutorError);
-        connect(m_interlocutor,
-                &Interlocutor::fileUploaded,
-                this,
-                &ChatModel::onNewAncientMemoryUploaded);
+        connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
         connect(m_interlocutor,
                 &Interlocutor::fileUploadFailed,
                 this,
-                &ChatModel::onCurationUploadFailed);
-        connect(m_interlocutor,
-                &Interlocutor::fileDeleted,
-                this,
-                &ChatModel::onOldAncientMemoryDeleted);
+                &ChatModel::onFileUploadFailed);
+        connect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted);
     }
 }
 
@@ -725,10 +716,10 @@ void ChatModel::onFileUploaded(const QString &fileId, const QString &purpose)
             if (m_managedFiles[i]->status() == ManagedFile::Uploading) {
                 m_managedFiles[i]->setFileId(fileId);
                 m_managedFiles[i]->setStatus(ManagedFile::Ready);
-                return; // On a trouvé et mis à jour le bon fichier
+                saveManagedFiles(); // SAUVEGARDER la liste après un upload réussi !
+                return;             // On a trouvé et mis à jour le bon fichier
             }
         }
-        saveManagedFiles(); // SAUVEGARDER la liste après un upload réussi !
     } else if (purpose == "curation_live_memory") {
         // Étape 1 de la curation : la mémoire vive est uploadée
         onLiveMemoryUploadedForCuration(fileId); // On appelle une fonction privée pour la suite
