@@ -35,7 +35,8 @@ void InterlocutorConfig::setEndpointUrl(const QString &endpointUrl) {
     }
 }
 
-QString InterlocutorConfig::systemPrompt() const { return m_systemPrompt; }
+QString InterlocutorConfig::systemPrompt() const { return m_systemPrompt + QString("\nPS: go through the attached file containing the older memory you curated yourself to see if there is something relevant or useful for the current conversation.\n"); }
+
 void InterlocutorConfig::setSystemPrompt(const QString &systemPrompt) {
     if (m_systemPrompt != systemPrompt) {
         m_systemPrompt = systemPrompt;

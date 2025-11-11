@@ -20,7 +20,7 @@ class OpenAIInterlocutor : public Interlocutor {
      explicit OpenAIInterlocutor(
          QString interlocutorName,
          const QString &apiKey, // Secret API Key
-         const QUrl &url, // For instance, for OpenAI: "https://api.openai.com/v1/chat/completions"
+         const QUrl &url, // For instance, for OpenAI: "https://api.openai.com/v1/responses"
          const QString &model, // For instance "gpt-4o"
          QObject *parent);
 

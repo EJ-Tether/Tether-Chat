@@ -64,7 +64,7 @@ void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history,
             QJsonObject responseObj;
             responseObj["choices"] = choicesArray;
             responseObj["id"] = "dummy-chatcmpl-12345";
-            responseObj["object"] = "chat.completion";
+            responseObj["object"] = "v1/responses";
             responseObj["created"] = QDateTime::currentSecsSinceEpoch();
             responseObj["model"] = "dummy-model";
 

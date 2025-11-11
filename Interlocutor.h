@@ -26,6 +26,9 @@ public:
     void setAncientMemoryFileId(QString fileId) { m_ancientMemoryFileId = fileId; }
 
 signals:
+    // NB: Signal responseReceived: Si on veut être multiAPI un jour, il faudra transcrire la réponse JSON reçue
+    // sous une forme générique pour tous les interlocuteurs, pour ne pas transférer le format OpenAI aux
+    // couches supérieures de l'appli qui sont censées être indépendantes du provider
     void responseReceived(const QJsonObject &response);
     void errorOccurred(const QString &error);
     void fileUploaded(const QString &fileId, const QString &purpose);

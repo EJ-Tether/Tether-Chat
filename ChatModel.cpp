@@ -15,21 +15,9 @@ ChatModel::ChatModel(QObject *parent)
     , m_liveMemoryTokens(0)
     , m_cumulativeTokenCost(0)
 {
+    qDebug()<<__FILE__<<__LINE__<<__PRETTY_FUNCTION__<<"CONNECT onFileUploaded fileUploadFailed";
     if (m_interlocutor) {
-        connect(m_interlocutor,
-                &Interlocutor::responseReceived,
-                this,
-                &ChatModel::handleInterlocutorResponse);
-        connect(m_interlocutor,
-                &Interlocutor::errorOccurred,
-                this,
-                &ChatModel::handleInterlocutorError);
-        connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
-        connect(m_interlocutor,
-                &Interlocutor::fileUploadFailed,
-                this,
-                &ChatModel::onFileUploadFailed);
-        connect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted);
+        setInterlocutor(m_interlocutor);
     }
 }
 
@@ -127,33 +115,40 @@ void ChatModel::sendMessage(const QString &messageText)
 
 void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
 {
-    // 1. Si la requête était une demande de curation de la mémoire ancienne,
-    // On va la traiter ici.
+    // 1) Cas curation
     if (m_isWaitingForCurationResponse) {
         qDebug() << "Step 3/4 Curation response received.";
         m_isWaitingForCurationResponse = false;
 
-        // On supprime le fichier temporaire de la mémoire vive
         m_interlocutor->deleteFile(m_liveMemoryFileIdForCuration);
         m_liveMemoryFileIdForCuration.clear();
 
         QString newSummary;
-        // Extraire le résumé de la réponse
-        if (response.contains("choices") && response["choices"].isArray()) {
-            QJsonArray choicesArray = response["choices"].toArray();
-            if (!choicesArray.isEmpty()) {
-                newSummary = choicesArray[0].toObject()["message"].toObject()["content"].toString();
+
+        if (response.contains("output") && response["output"].isArray()) {
+            const QJsonArray output = response["output"].toArray();
+            for (const QJsonValue &v : output) {
+                const QJsonObject outObj = v.toObject();
+                if (outObj.value("role").toString() == "assistant" &&
+                    outObj.contains("content") && outObj["content"].isArray())
+                {
+                    const QJsonArray content = outObj["content"].toArray();
+                    for (const QJsonValue &cv : content) {
+                        const QJsonObject co = cv.toObject();
+                        const QString type = co.value("type").toString();
+                        if (type == "output_text" || type == "summary_text") {
+                            newSummary += co.value("text").toString();
+                        }
+                    }
+                }
             }
         }
 
         if (!newSummary.isEmpty()) {
             qDebug() << "Step 4/4: Uploading new ancient memory...";
             saveOlderMemory(newSummary);
-            // On stocke l'ID de l'ancienne mémoire pour la supprimer après le nouvel upload
-            InterlocutorConfig *config = findCurrentConfig();
-            if (config && !config->ancientMemoryFileId().isEmpty()) {
+            if (InterlocutorConfig *config = findCurrentConfig(); config && !config->ancientMemoryFileId().isEmpty())
                 m_oldAncientMemoryFileIdToDelete = config->ancientMemoryFileId();
-            }
             m_interlocutor->uploadFile(newSummary.toUtf8(), "curation_ancient_memory");
             qDebug() << "Older memory successfully updated.";
             emit curationFinished(true);
@@ -162,75 +157,74 @@ void ChatModel::handleInterlocutorResponse(const QJsonObject &response)
             emit curationFinished(false);
         }
 
-        // Réinitialiser les flags
         m_isWaitingForCurationResponse = false;
         m_isCurationInProgress = false;
-        return; // Le traitement de cette réponse est terminé.
+        return;
     }
-    // --- FIN DE LA LOGIQUE DE CURATION ---
 
-    // 2. Retirer l'indicateur d'attente de réponse, qui est le dernier message de la liste
+    // 2) Retirer le typing indicator
     if (!m_messages.isEmpty() && m_messages.last().isTypingIndicator) {
         beginRemoveRows(QModelIndex(), m_messages.count() - 1, m_messages.count() - 1);
         m_messages.removeLast();
         endRemoveRows();
     }
 
-    // 3. Extraire le contenu du message de l'IA de la réponse (structure OpenAI-like)
+    // 3) Extraire le texte retourné (concatène tous les output_text)
     QString aiResponseText;
-    int promptTokens = 0;
-    int completionTokens = 0;
-    int totalTokensForThisExchange = 0;
-
-    if (response.contains("choices") && response["choices"].isArray()) {
-        QJsonArray choicesArray = response["choices"].toArray();
-        if (!choicesArray.isEmpty() && choicesArray[0].isObject()) {
-            QJsonObject firstChoice = choicesArray[0].toObject();
-            if (firstChoice.contains("message") && firstChoice["message"].isObject()) {
-                QJsonObject message = firstChoice["message"].toObject();
-                qDebug()<<"Objet JSON reçu:"<<message;
-                if (message.contains("content")) {
-                    aiResponseText = message["content"].toString();
+    if (response.contains("output") && response["output"].isArray()) {
+        const QJsonArray output = response["output"].toArray();
+        for (const QJsonValue &v : output) {
+            const QJsonObject outObj = v.toObject();
+            if (outObj.value("role").toString() == "assistant" &&
+                outObj.contains("content") && outObj["content"].isArray())
+            {
+                const QJsonArray content = outObj["content"].toArray();
+                for (const QJsonValue &cv : content) {
+                    const QJsonObject co = cv.toObject();
+                    const QString type = co.value("type").toString();
+                    if (type == "output_text") {
+                        aiResponseText += co.value("text").toString();
+                    }
                 }
             }
         }
     }
 
+    // 4) Tokens
+    int inputTokens = 0;
+    int outputTokens = 0;
+    int totalTokensForThisExchange = 0;
     if (response.contains("usage") && response["usage"].isObject()) {
-        QJsonObject usage = response["usage"].toObject();
-        promptTokens = usage["prompt_tokens"].toInt(0);
-        completionTokens = usage["completion_tokens"].toInt(0);
-        totalTokensForThisExchange = usage["total_tokens"].toInt(0);
+        const QJsonObject usage = response["usage"].toObject();
+        inputTokens  = usage.value("input_tokens").toInt(0);
+        outputTokens = usage.value("output_tokens").toInt(0);
+        totalTokensForThisExchange = usage.value("total_tokens").toInt(inputTokens + outputTokens);
     }
 
-    // 4. Mettre à jour la taille de la Mémoire Vive pour la curation
-    // La nouvelle taille est simplement le `prompt_tokens` (qui inclut l'historique) + `completion_tokens`.
-    int newLiveMemorySize = promptTokens + completionTokens;
+    // maj mémoire vive
+    const int newLiveMemorySize = inputTokens + outputTokens;
     if (m_liveMemoryTokens != newLiveMemorySize) {
         m_liveMemoryTokens = newLiveMemorySize;
         emit liveMemoryTokensChanged();
         qDebug() << "Live Memory size is now:" << m_liveMemoryTokens << "tokens.";
     }
 
-    // 5. Mettre à jour le coût cumulatif pour l'utilisateur
-    // On AJOUTE le coût de cet échange au total.
+    // coût cumulé
     m_cumulativeTokenCost += totalTokensForThisExchange;
     emit cumulativeTokenCostChanged();
-    qDebug() << "Cumulative token cost is now:" << m_cumulativeTokenCost;
 
-    setWaitingForReply(false); // Fin de l'attente
+    setWaitingForReply(false);
 
-    // Ajouter le message de l'IA au modèle, en stockant les tokens de cet échange
+    // 5) Push message assistant
     ChatMessage aiMessage(false,
                           aiResponseText,
                           QDateTime::currentDateTime(),
-                          promptTokens,
-                          completionTokens,
+                          inputTokens,
+                          outputTokens,
                           "assistant");
     addMessage(aiMessage);
 
-    // 6. Vérifier si il y a nécessité de faire une curation de la mémoire ancienne.
-    // La curation est basée sur la taille de la mémoire vive
+    // 6) Curation éventuelle
     checkCurationThreshold();
 }
 
@@ -452,17 +446,17 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
         connect(m_interlocutor,
                 &Interlocutor::responseReceived,
                 this,
-                &ChatModel::handleInterlocutorResponse);
+                &ChatModel::handleInterlocutorResponse, Qt::UniqueConnection);
         connect(m_interlocutor,
                 &Interlocutor::errorOccurred,
                 this,
-                &ChatModel::handleInterlocutorError);
-        connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
+                &ChatModel::handleInterlocutorError, Qt::UniqueConnection);
+        connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded, Qt::UniqueConnection);
         connect(m_interlocutor,
                 &Interlocutor::fileUploadFailed,
                 this,
                 &ChatModel::onFileUploadFailed);
-        connect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted);
+        connect(m_interlocutor, &Interlocutor::fileDeleted, this, &ChatModel::onFileDeleted, Qt::UniqueConnection);
     }
 }
 
@@ -500,24 +494,23 @@ void ChatModel::triggerCuration()
     int tokensToCull = 0;
     int numMessagesToRemove = 0;
 
-    // On retire les messages jusqu'à redescendre sous le seuil de base
-    while (m_liveMemoryTokens > BASE_LIVE_MEMORY_TOKENS && !m_messages.isEmpty()) {
-        ChatMessage msg = m_messages.first();
-        messagesToCurate.append(msg);
-
-        int msgTokens = msg.promptTokens() + msg.completionTokens();
-        // Estimation si les tokens sont à 0
-        if (msgTokens == 0)
-            msgTokens = msg.text().length() / 4;
-
-        m_liveMemoryTokens -= msgTokens;
-        m_messages.removeFirst();
-        numMessagesToRemove++;
-    }
-
     if (numMessagesToRemove > 0) {
         qDebug() << "Culling" << numMessagesToRemove << "messages from live memory.";
         beginRemoveRows(QModelIndex(), 0, numMessagesToRemove - 1);
+        // On retire les messages jusqu'à redescendre sous le seuil de base
+        while (m_liveMemoryTokens > BASE_LIVE_MEMORY_TOKENS && !m_messages.isEmpty()) {
+            ChatMessage msg = m_messages.first();
+            messagesToCurate.append(msg);
+
+            int msgTokens = msg.promptTokens() + msg.completionTokens();
+            // Estimation si les tokens sont à 0
+            if (msgTokens == 0)
+                msgTokens = msg.text().length() / 4;
+
+            m_liveMemoryTokens -= msgTokens;
+            m_messages.removeFirst();
+            numMessagesToRemove++;
+        }
         endRemoveRows();
         rewriteChatFile();              // On met à jour le fichier de la mémoire vive
         emit liveMemoryTokensChanged(); // On notifie l'UI du nouveau total de tokens
@@ -530,12 +523,14 @@ void ChatModel::triggerCuration()
     // --- Phase 2: Préparation de la requête de résumé ---
     QString olderMemory = loadOlderMemory();
     QString conversationToSummarize;
-    for (const auto &msg : messagesToCurate) { /* ... */
+    conversationToSummarize.reserve(24*1024);
+    for (const auto &msg : messagesToCurate) {
+        conversationToSummarize += msg.role();
+        conversationToSummarize += ": ";
+        conversationToSummarize += msg.text();
+        conversationToSummarize += "\n\n";
     }
-
-    qDebug() << "Step 1/4: Uploading live memory for curation...";
-    // On connecte un slot spécifique pour cette étape
-    qDebug() << "Step 1/4: Uploading live memory for curation...";
+    qDebug() << "Step 1/4: Uploading live memory for curation... Length of the conversation to summarize="<< conversationToSummarize.size();
     // On donne un "purpose" spécifique pour que le slot `onFileUploaded` sache quoi faire
     m_interlocutor->uploadFile(conversationToSummarize.toUtf8(), "curation_live_memory");
 }

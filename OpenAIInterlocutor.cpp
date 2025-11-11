@@ -20,93 +20,112 @@ OpenAIInterlocutor::OpenAIInterlocutor(QString interlocutorName,
     , m_url(url)
     , m_model(model)
 {
+    qDebug()<<"Creating OpenAIInterlocutor url="<<url;
     m_manager = new QNetworkAccessManager(this);
 }
 
 void OpenAIInterlocutor::setSystemPrompt(const QString &systemPrompt)
 {
-    if (!systemPrompt.isEmpty()) {
-        m_systemMsg["role"] = "system";
-        m_systemMsg["content"] = systemPrompt;
-    } else {
-        m_systemMsg = QJsonObject(); // Vider si le prompt est vide
-    }
+    m_systemMsg = QJsonObject();
+    if (systemPrompt.isEmpty())
+        return;
+
+    m_systemMsg["role"] = "developer";
+    QJsonArray contentArray;
+    contentArray.append(QJsonObject{
+        {"type", "input_text"},
+        {"text", systemPrompt}
+    });
+    m_systemMsg["content"] = contentArray;
 }
 
 void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
                                      const QStringList &attachmentFileIds)
 {
-    QStringList allAttachments = attachmentFileIds;
-    if (!m_ancientMemoryFileId.isEmpty()) {
-        allAttachments.append(m_ancientMemoryFileId);
+    if (m_apiKey.trimmed().isEmpty()) {
+        emit fileUploadFailed("Missing OpenAI API key.");
+        return;
     }
 
     QNetworkRequest request(m_url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
 
-    // --- Construction du payload JSON pour OpenAI ---
+    // --- Construction du payload JSON ---
     QJsonObject payload;
     payload["model"] = m_model;
 
-    QJsonArray messagesArray;
-    // 1. Ajouter le message système s'il existe
-    if (!m_systemMsg.isEmpty()) {
-        messagesArray.append(m_systemMsg);
-    }
+    QJsonArray inputArray;
 
-    // 2. Ajouter tout l'historique
+    // 1) Prompt système (déjà préparé par setSystemPrompt)
+    if (!m_systemMsg.isEmpty())
+        inputArray.append(m_systemMsg);
+
+    // 2) Historique
     for (const ChatMessage &msg : history) {
-        QJsonObject messageObject;
-        messageObject["role"] = msg.isLocalMessage() ? "user" : "assistant";
-        messageObject["content"] = msg.text();
-        messagesArray.append(messageObject);
+        QJsonObject messageObj;
+        const bool isUser = msg.isLocalMessage();
+        messageObj["role"] = isUser ? "user" : "assistant";
+
+        // IMPORTANT : type = input_text pour l’utilisateur/développeur,
+        // et output_text pour l’historique assistant.
+        const char* t = isUser ? "input_text" : "output_text";
+
+        QJsonArray contentArray;
+        contentArray.append(QJsonObject{
+            {"type", t},
+            {"text", msg.text()}
+        });
+
+        messageObj["content"] = contentArray;
+        inputArray.append(messageObj);
     }
 
-    // On rajouter la Ancient History en fichier attaché sur le dernier message utilisateur
-    if (!history.isEmpty()) {
-        QJsonObject lastUserMessage = messagesArray.last().toObject();
-        messagesArray.removeLast(); // On le retire pour le modifier
+    payload["input"] = inputArray;
 
-        if (!allAttachments.isEmpty()) {
-            QJsonArray attachmentsArray;
-            for (const QString &fileId : allAttachments) {
-                QJsonObject attachment;
-                attachment["file_id"] = fileId;
-                // Le "tool" pour les pièces jointes standard est "file_search" (anciennement "retrieval")
-                QJsonObject tool;
-                tool["type"] = "file_search";
-                attachment["tools"] = QJsonArray({tool});
-                attachmentsArray.append(attachment);
-            }
-            lastUserMessage["attachments"] = attachmentsArray;
+    // 3) Outils
+    QJsonArray tools;
+    tools.append(QJsonObject{{"type", "file_search"}});
+    payload["tools"] = tools;
+
+    // 4) Attachements (donner explicitement les droits au tool)
+    QStringList allAttachments = attachmentFileIds;
+    if (!m_ancientMemoryFileId.isEmpty())
+        allAttachments.append(m_ancientMemoryFileId);
+
+    if (!allAttachments.isEmpty()) {
+        QJsonArray attachmentsArray;
+        for (const QString &fid : allAttachments) {
+            attachmentsArray.append(QJsonObject{
+                {"file_id", fid},
+                {"tools", QJsonArray{ QJsonObject{{"type","file_search"}} }}
+            });
         }
-        messagesArray.append(lastUserMessage);
+        payload["attachments"] = attachmentsArray;
     }
 
-    payload["messages"] = messagesArray;
+    qDebug().noquote() << "Sending JSON to OpenAI /v1/responses:\n"
+                       << QJsonDocument(payload).toJson(QJsonDocument::Indented);
 
-    payload["messages"] = messagesArray;
-
-    // Pour le streaming, si vous l'implémentez plus tard :
-    // payload["stream"] = true;
-
-    qDebug()<<"Sending JSON"<<payload;
-
-    QByteArray data = QJsonDocument(payload).toJson();
+    QByteArray data = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_manager->post(request, data);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        // ... (gestion du timeout)
+        QByteArray raw = reply->readAll();
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
         if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument jsonResponse = QJsonDocument::fromJson(reply->readAll());
+            QJsonDocument jsonResponse = QJsonDocument::fromJson(raw);
             if (!jsonResponse.isNull() && jsonResponse.isObject()) {
                 emit responseReceived(jsonResponse.object());
             } else {
+                qWarning() << "Invalid JSON response from OpenAI API:" << raw;
                 emit errorOccurred("Invalid JSON response from OpenAI API.");
             }
         } else {
-            emit errorOccurred("API Error: " + reply->errorString());
+            qWarning() << "API Error:" << statusCode << reply->errorString()
+            << "\nResponse body:" << raw;
+            emit errorOccurred(QString("API Error %1: %2").arg(statusCode).arg(reply->errorString()));
         }
         reply->deleteLater();
     });
@@ -114,12 +133,20 @@ void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
 
 void OpenAIInterlocutor::uploadFile(const QByteArray &content, const QString &purpose)
 {
+    if (m_apiKey.trimmed().isEmpty()) {
+        emit fileUploadFailed("OpenAIInterlocutor::uploadFile: Missing OpenAI API key.");
+        return;
+    }
+
     QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+    // 🔧 Mapper purpose interne -> API
+    const QByteArray apiPurpose = QByteArray("assistants");
 
     QHttpPart purposePart;
     purposePart.setHeader(QNetworkRequest::ContentDispositionHeader,
                           QVariant("form-data; name=\"purpose\""));
-    purposePart.setBody(purpose.toUtf8());
+    purposePart.setBody(apiPurpose);  // <-- was: purpose.toUtf8()
 
     QHttpPart filePart;
     filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
@@ -133,28 +160,42 @@ void OpenAIInterlocutor::uploadFile(const QByteArray &content, const QString &pu
     QUrl url("https://api.openai.com/v1/files");
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
+    request.setRawHeader("OpenAI-Beta", "assistants=v2");
 
     QNetworkReply *reply = m_manager->post(request, multiPart);
-    multiPart->setParent(reply); // Important pour la gestion de la mémoire
+    multiPart->setParent(reply);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, purpose]() {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray raw = reply->readAll();
+
         if (reply->error() == QNetworkReply::NoError) {
-            QJsonObject response = QJsonDocument::fromJson(reply->readAll()).object();
-            qDebug()<<"JSON Response"<<response;
-            QString fileId = response["id"].toString();
+            const QJsonDocument doc = QJsonDocument::fromJson(raw);
+            const QJsonObject obj = doc.object();
+            const QString fileId = obj.value("id").toString();
             if (!fileId.isEmpty()) {
-                qDebug() << "File uploaded successfully. ID:" << fileId;
-                emit fileUploaded(fileId, purpose);
+                qDebug() << "File uploaded successfully. HTTP" << status << "ID:" << fileId;
+                emit fileUploaded(fileId, purpose); // <-- on réémet le purpose interne
             } else {
-                qWarning() << "File upload failed, response:" << response;
+                qWarning() << "File upload: missing 'id' in response. HTTP" << status << "Body:" << raw;
                 emit fileUploadFailed("Could not get File ID from API response.");
             }
         } else {
-            qWarning() << "File upload API error:" << reply->errorString();
+            qWarning() << "File upload API error. HTTP" << status
+                       << "QtErr:" << reply->errorString()
+                       << "Body:" << raw;
             emit fileUploadFailed(reply->errorString());
         }
         reply->deleteLater();
     });
+    QTimer::singleShot(30000, reply, [reply]() {
+        if (reply->isRunning()) {
+            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            reply->abort();
+            qWarning() << "Request timed out. Status code="<<statusCode;
+        }
+    });
+    reply->deleteLater();
 }
 
 void OpenAIInterlocutor::deleteFile(const QString &fileId)
