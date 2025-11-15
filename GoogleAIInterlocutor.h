@@ -18,9 +18,11 @@ public:
                                   const QUrl &url,
                                   QObject *parent = nullptr);
 
-    Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
-                                 const QStringList &attachmentFileIds) override;
-    void setSystemPrompt(const QString &systemPrompt) override;
+    void sendRequest(
+        const QList<ChatMessage> &history,
+        const QString& ancientMemory,
+        InterlocutorReply::Kind kind,
+        const QStringList &attachmentFileIds) override;
     void uploadFile(const QByteArray &content, const QString &purpose) override {
         qDebug()<<"GoogleAIInterlocutor::uploadFile:"<<content<<purpose;
     }
@@ -32,7 +34,6 @@ private:
     QString m_apiKey;
     QUrl m_url;
     QNetworkAccessManager *m_manager;
-    QString m_systemPrompt;
 };
 
 #endif // GOOGLEAIINTERLOCUTOR_H

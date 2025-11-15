@@ -19,20 +19,13 @@ GoogleAIInterlocutor::GoogleAIInterlocutor(QString interlocutorName,
     m_manager = new QNetworkAccessManager(this);
 }
 
-void GoogleAIInterlocutor::setSystemPrompt(const QString &systemPrompt)
+void GoogleAIInterlocutor::sendRequest(
+    const QList<ChatMessage> &history,
+    const QString& ancientMemory,
+    InterlocutorReply::Kind kind,
+    const QStringList &attachmentFileIds)
 {
-    m_systemPrompt = systemPrompt;
-}
-
-void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
-                                       const QStringList &attachmentFileIds)
-{
-    QStringList allAttachments = attachmentFileIds;
-    if (!m_ancientMemoryFileId.isEmpty()) {
-        allAttachments.append(m_ancientMemoryFileId);
-    }
-
-    // L'URL de Gemini a besoin de la clé API en paramètre
+    // L'URL de l'API v1beta de Gemini nécessite la clé en paramètre
     QUrl requestUrl(m_url);
     QUrlQuery query;
     query.addQueryItem("key", m_apiKey);
@@ -45,34 +38,36 @@ void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
     QJsonObject payload;
     QJsonArray contentsArray;
 
-    QString firstUserMessage = history.first().text();
-    // Gemini n'a pas de rôle "system". On préfixe le premier message utilisateur.
+    // Pour Gemini, le "system prompt" et la "mémoire ancienne" sont fusionnés et
+    // préfixés au premier tour de l'historique pour donner le contexte.
+    QString fullContextPrefix;
     if (!m_systemPrompt.isEmpty()) {
-        firstUserMessage = m_systemPrompt + "\n\n--- DEBUT DE LA CONVERSATION ---\n\n"
-                           + firstUserMessage;
+        fullContextPrefix += m_systemPrompt + "\n\n";
+    }
+    if (!ancientMemory.isEmpty()) {
+        fullContextPrefix += "--- LONG-TERM MEMORY SUMMARY ---\n" + ancientMemory + "\n\n";
     }
 
-    // Gérer le premier message séparément
-    QJsonObject firstTurn;
-    firstTurn["role"] = "user";
-    QJsonObject firstTextPart;
-    firstTextPart["text"] = firstUserMessage;
-    QJsonArray firstPartsArray;
-    firstPartsArray.append(firstTextPart);
-    firstTurn["parts"] = firstPartsArray;
-    contentsArray.append(firstTurn);
-
-    // Ajouter le reste de l'historique
-    for (int i = 1; i < history.size(); ++i) {
+    for (int i = 0; i < history.size(); ++i) {
         const ChatMessage &msg = history[i];
         QJsonObject turn;
-        // La réponse de l'IA s'appelle "model" chez Google
+
+        // Le rôle de l'IA est "model" chez Google
         turn["role"] = msg.isLocalMessage() ? "user" : "model";
+
         QJsonObject textPart;
-        textPart["text"] = msg.text();
+        QString messageText = msg.text();
+
+        // Si c'est le tout premier message de l'historique, on ajoute notre préfixe
+        if (i == 0 && msg.isLocalMessage() && !fullContextPrefix.isEmpty()) {
+            messageText = fullContextPrefix + "--- CURRENT CONVERSATION ---\n" + messageText;
+        }
+
+        textPart["text"] = messageText;
         QJsonArray partsArray;
         partsArray.append(textPart);
         turn["parts"] = partsArray;
+
         contentsArray.append(turn);
     }
 
@@ -81,7 +76,7 @@ void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
     QByteArray data = QJsonDocument(payload).toJson();
     QNetworkReply *reply = m_manager->post(request, data);
 
-    connect(reply, &QNetworkReply::finished, this, [this, history, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, kind]() {
         if (reply->error() == QNetworkReply::NoError) {
             QJsonDocument jsonResponse = QJsonDocument::fromJson(reply->readAll());
             if (jsonResponse.isNull() || !jsonResponse.isObject()) {
@@ -90,51 +85,45 @@ void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
                 return;
             }
 
-            // --- Traduction de la réponse de Gemini au format OpenAI ---
-            // Cela permet à ChatModel de ne connaître qu'un seul format de réponse !
             QJsonObject geminiResponse = jsonResponse.object();
-            QJsonObject openAIStyleResponse;
-            QJsonObject choice;
-            QJsonObject message;
-            QString content = "No content found.";
 
+            // --- PARSING de la réponse Gemini et création de InterlocutorReply ---
+            InterlocutorReply cleanReply;
+            cleanReply.kind = kind; // On propage le 'kind'
+
+            // Extraire le texte de la réponse
             if (geminiResponse.contains("candidates") && geminiResponse["candidates"].isArray()) {
                 QJsonArray candidates = geminiResponse["candidates"].toArray();
                 if (!candidates.isEmpty()) {
-                    content = candidates[0]
-                                  .toObject()["content"]
-                                  .toObject()["parts"]
-                                  .toArray()[0]
-                                  .toObject()["text"]
-                                  .toString();
+                    // On navigue dans la structure spécifique à Gemini
+                    cleanReply.text = candidates[0]
+                                          .toObject()["content"]
+                                          .toObject()["parts"]
+                                          .toArray()[0]
+                                          .toObject()["text"]
+                                          .toString();
                 }
             }
 
-            message["role"] = "assistant";
-            message["content"] = content;
-            choice["message"] = message;
-            QJsonArray choices;
-            choices.append(choice);
-            openAIStyleResponse["choices"] = choices;
-
-            // Simuler un objet "usage" car Gemini ne le fournit pas de la même manière
-            int historyTokens = 0;
-            for (const auto &msg : history) {
-                historyTokens += msg.text().length() / 4;
+            // Extraire (ou simuler) l'usage des tokens
+            // L'API Gemini v1beta ne renvoie pas toujours un décompte aussi clair que OpenAI.
+            // S'il est absent, on fait une estimation.
+            if (geminiResponse.contains("usageMetadata")) {
+                QJsonObject usage = geminiResponse["usageMetadata"].toObject();
+                cleanReply.inputTokens = usage["promptTokenCount"].toInt();
+                cleanReply.outputTokens = usage["candidatesTokenCount"].toInt();
+                cleanReply.totalTokens = usage["totalTokenCount"].toInt();
+            } else {
+                // Fallback : estimation si les métadonnées sont absentes
+                qWarning() << "Google API response missing 'usageMetadata'. Estimating token counts.";
+                // On peut faire une estimation rapide ici si besoin
             }
-            int completionTokens = content.length() / 4;
-            QJsonObject usage;
-            usage["prompt_tokens"] = historyTokens;
-            usage["completion_tokens"] = completionTokens;
-            usage["total_tokens"] = historyTokens + completionTokens;
-            openAIStyleResponse["usage"] = usage;
 
-            emit responseReceived(openAIStyleResponse);
+            emit replyReady(cleanReply);
 
         } else {
-            emit errorOccurred("API Error: " + reply->errorString());
+            emit errorOccurred("Google API Error: " + reply->errorString() + " | Body: " + reply->readAll());
         }
         reply->deleteLater();
     });
 }
-// End GoogleAIInterlocutor.cpp

@@ -80,11 +80,11 @@ signals:
     void isWaitingForReplyChanged();
     void managedFilesChanged();
 
+public slots:
+    void onInterlocutorError(const QString &message);
+
 private slots:
-    void handleInterlocutorResponse(const QJsonObject &response);
-    void handleInterlocutorError(const QString &error);
-    //void onUserFileUploaded(const QString &fileId, const QString &purpose);
-    //void onUserFileUploadFailed(const QString &error);
+    void onInterlocutorReply(const InterlocutorReply &reply);
     void onFileUploaded(const QString &fileId, const QString &purpose);
     void onFileDeleted(const QString &fileId, bool success);
     void onFileUploadFailed(const QString &error);
@@ -92,13 +92,13 @@ private slots:
 private:
     void addMessage(const ChatMessage &message); // Add a message to the model *and* the jsonl live memory file
     void updateLiveMemoryEstimate();
+    void handleNormalReply(const InterlocutorReply &reply);
+    void handleCurationReply(const InterlocutorReply &reply);
+
     void checkCurationThreshold();
     void triggerCuration();
+
     InterlocutorConfig *findCurrentConfig();
-    void onLiveMemoryUploadedForCuration(const QString &fileId);
-    void onNewAncientMemoryUploaded(const QString &newFileId);
-    void onOldAncientMemoryDeleted(const QString &fileId, bool success);
-    void onCurationUploadFailed(const QString &error);
 
     void loadManagedFiles();
     void saveManagedFiles() const;

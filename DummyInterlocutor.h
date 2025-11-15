@@ -3,11 +3,7 @@
 #define DUMMYINTERLOCUTOR_H
 
 #include "Interlocutor.h"
-#include <QTimer>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
-#include <QRandomGenerator>
+#include <QTimer> // QTimer est un détail d'implémentation, on pourrait s'en passer ici
 
 class DummyInterlocutor : public Interlocutor
 {
@@ -15,28 +11,19 @@ class DummyInterlocutor : public Interlocutor
 public:
     explicit DummyInterlocutor(QString interlocutorName, QObject *parent = nullptr);
 
-    Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
-                                 const QStringList &attachmentFileIds) override;
+    // Implémentation de la nouvelle signature pour les requêtes de chat/curation
+    void sendRequest(const QList<ChatMessage> &history,
+                     const QString& ancientMemory,
+                     const InterlocutorReply::Kind kind,
+                     const QStringList &attachmentFileIds = {}) override;
 
-    void uploadFile(const QByteArray &content, const QString &purpose) override {
-        qDebug()<<"DummyInterlocutor::uploadFile:"<<content<<purpose;
-        QTimer::singleShot(900, this, [this, purpose]() {
-            qDebug() << "DummyInterlocutor: Upload finished.";
-            emit fileUploaded("dummy_id_" + QString::number(QRandomGenerator::global()->bounded(256)), purpose);
-        });
-    }
-    void deleteFile(const QString &fileId) override {
-        qDebug()<<"DummyInterlocutor::deleteFile:"<<fileId;
-        QTimer::singleShot(900, this, [this, fileId]() {
-            qDebug() << "DummyInterlocutor: Upload finished.";
-            // On émet le signal APRÈS le délai
-            emit fileDeleted(fileId, true);
-        });
-    }
-
+    // Implémentation des méthodes de gestion de fichiers
+    void uploadFile(const QByteArray &content, const QString &purpose) override;
+    void deleteFile(const QString &fileId) override;
 
 private:
-    QTimer *m_responseTimer;
+    // On peut utiliser un seul QTimer pour toutes nos simulations de délai
+    QTimer *m_delayTimer;
 };
 
 #endif // DUMMYINTERLOCUTOR_H

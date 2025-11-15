@@ -55,7 +55,8 @@ public:
     Q_INVOKABLE void updateConfigWithModel(const QString &modelDisplayName);
 
     QStringList availableProviders() const;
-    InterlocutorConfig *findCurrentConfig() { return m_currentConfig; }
+    InterlocutorConfig *findCurrentConfig();
+    InterlocutorConfig *findConfigByName(const QString &configName);
 
 signals:
     void interlocutorNamesChanged();
@@ -63,8 +64,6 @@ signals:
     void currentConfigChanged();
 
 private:
-    void loadInterlocutors(); // Charge les interlocuteurs (depuis la config, etc.)
-
     ChatModel* m_chatModel;
     QMap<QString, Interlocutor*> m_interlocutors; // Stocke tous les interlocuteurs par nom
     QString m_activeInterlocutorName;

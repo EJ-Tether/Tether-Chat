@@ -24,9 +24,11 @@ class OpenAIInterlocutor : public Interlocutor {
          const QString &model, // For instance "gpt-4o"
          QObject *parent);
 
-     Q_INVOKABLE void sendRequest(const QList<ChatMessage> &history,
-                                  const QStringList &attachmentFileIds) override;
-     void setSystemPrompt(const QString &systemPrompt) override;
+     void sendRequest(
+         const QList<ChatMessage> &history,
+         const QString& ancientMemory,
+         const InterlocutorReply::Kind kind,
+         const QStringList &attachmentFileIds) override;;
 
      // Les signaux ci-dessous sont hérités de la classe mère `Interlocutor`
      // signals:
@@ -40,7 +42,6 @@ class OpenAIInterlocutor : public Interlocutor {
      QString m_apiKey;
      QString m_model;
      QNetworkAccessManager *m_manager;
-     QJsonObject m_systemMsg;
      const int REQUEST_TIMEOUT_MS = 100000;
      QMap<QNetworkReply *, QTimer *> m_requestTimers;
 };

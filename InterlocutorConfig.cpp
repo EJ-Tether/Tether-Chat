@@ -35,7 +35,7 @@ void InterlocutorConfig::setEndpointUrl(const QString &endpointUrl) {
     }
 }
 
-QString InterlocutorConfig::systemPrompt() const { return m_systemPrompt + QString("\nPS: go through the attached file containing the older memory you curated yourself to see if there is something relevant or useful for the current conversation.\n"); }
+QString InterlocutorConfig::systemPrompt() const { return m_systemPrompt; }
 
 void InterlocutorConfig::setSystemPrompt(const QString &systemPrompt) {
     if (m_systemPrompt != systemPrompt) {
@@ -56,18 +56,18 @@ void InterlocutorConfig::setModelName(const QString &modelName)
     }
 }
 
-QString InterlocutorConfig::ancientMemoryFileId()
-{
-    return m_ancientMemoryFileId;
-}
+// QString InterlocutorConfig::ancientMemoryFileId()
+// {
+//     return m_ancientMemoryFileId;
+// }
 
-void InterlocutorConfig::setAncientMemoryFileId(const QString &ancientMemoryFileId)
-{
-    if (m_ancientMemoryFileId != ancientMemoryFileId) {
-        m_ancientMemoryFileId = ancientMemoryFileId;
-        emit ancientMemoryFileIdChanged();
-    }
-}
+// void InterlocutorConfig::setAncientMemoryFileId(const QString &ancientMemoryFileId)
+// {
+//     if (m_ancientMemoryFileId != ancientMemoryFileId) {
+//         m_ancientMemoryFileId = ancientMemoryFileId;
+//         emit ancientMemoryFileIdChanged();
+//     }
+// }
 
 void InterlocutorConfig::read(const QJsonObject &json) {
     setName(json["name"].toString());

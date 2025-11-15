@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include "ChatMessage.h"
+#include "InterlocutorReply.h"
 
 class Interlocutor : public QObject
 {
@@ -17,23 +18,26 @@ public:
     }
     virtual ~Interlocutor() {}
 
-    Q_INVOKABLE virtual void sendRequest(const QList<ChatMessage> &history,
-                                         const QStringList &attachmentFileIds = {})
-        = 0;
+    virtual void sendRequest(
+        const QList<ChatMessage> &history,
+        const QString& ancientMemory,
+        const InterlocutorReply::Kind kind,
+        const QStringList &attachmentFileIds) = 0;
+
     virtual void uploadFile(const QByteArray &content, const QString &purpose) = 0;
     virtual void deleteFile(const QString &fileId) = 0;
-    virtual void setSystemPrompt(const QString &systemPrompt) {}
-    void setAncientMemoryFileId(QString fileId) { m_ancientMemoryFileId = fileId; }
+    virtual void setSystemPrompt(const QString &systemPrompt) {
+        m_systemPrompt = systemPrompt;
+    }
 
 signals:
-    // NB: Signal responseReceived: Si on veut être multiAPI un jour, il faudra transcrire la réponse JSON reçue
-    // sous une forme générique pour tous les interlocuteurs, pour ne pas transférer le format OpenAI aux
-    // couches supérieures de l'appli qui sont censées être indépendantes du provider
-    void responseReceived(const QJsonObject &response);
+    void replyReady(const InterlocutorReply &reply);
     void errorOccurred(const QString &error);
+
+    // Uniquement pour les PDF uploadés par l'utilisateur :
     void fileUploaded(const QString &fileId, const QString &purpose);
-    void fileDeleted(const QString &fileId, bool success);
     void fileUploadFailed(const QString &error);
+    void fileDeleted(const QString &fileId, bool success);
 
 protected:
     // m_interlocutorName: That's the name that the user entered in the 'configuration' tab.
@@ -41,9 +45,10 @@ protected:
     //   (1) naming the jsonl file of the current discussion and the other informations
     //   (2) being displayed in the combo box for chosing the current interlocutor
     QString m_interlocutorName;
-    QString m_ancientMemoryFileId;
+    QString m_systemPrompt; // Copie locale du system prompt changé par le ChatManager à chaque changement d'interlocuteur
 
 };
+
 
 #endif // INTERLOCUTOR_H
 // End source file Interlocutor.h

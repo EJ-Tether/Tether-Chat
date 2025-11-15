@@ -27,22 +27,16 @@ ApplicationWindow {
             messageInput.text = "";
         }
     }
-    //// Connecter aux signaux de chatModel pour la gestion des erreurs et le défilement
-    //Connections {
-    //    target: currentChatModel
-    //    function onChatMessageAdded(message) {
-    //        _messageListView.positionViewAtEnd();
-    //    }
-    //    function onChatError(error) {
-    //        console.error("Chat Error:", error);
-    //        // Afficher l'erreur à l'utilisateur, par exemple dans une petite bulle ou une toast
-    //    }
-    //    function onTotalTokensChanged() {
-    //        console.log("Total tokens:", chatModel.totalTokens);
-    //        // TODO: Mettre à jour un QLabel pour afficher le nombre de tokens
-    //    }
-    //}
 
+    Connections {
+        target: chatModel
+        function onChatError(message) {
+            console.warn("Chat error:", message)
+            // Afficher ici une popup ou quelque chose.
+            errorBanner.text = message
+            errorBanner.visible = true
+        }
+    }
 
     // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner
     // containing the Tab bar on top, and the main area in the rest of the window. The nature

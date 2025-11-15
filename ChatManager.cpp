@@ -30,29 +30,14 @@ ChatManager::ChatManager(QObject *parent)
         saveConfig(m_currentConfig);
     }
 
-    if (m_activeInterlocutorName.isEmpty() && !m_interlocutors.isEmpty()) {
-        switchToInterlocutor(m_interlocutors.firstKey());
-    }
+    //if (m_activeInterlocutorName.isEmpty() && !m_interlocutors.isEmpty()) {
+    //    switchToInterlocutor(m_interlocutors.firstKey());
+    //}
 }
 
 ChatManager::~ChatManager()
 {
     // Le QObject parent s'occupe de détruire les enfants (m_chatModel, m_interlocutors)
-}
-
-void ChatManager::loadInterlocutors()
-{
-    // Pour l'instant, on charge juste le Dummy en dur.
-    // Plus tard, on chargera tous les Interlocutor connus depuis l'objet Settings (qui reflète l'onglet Configuration)
-    auto dummy = new DummyInterlocutor("Dummy", this);
-    m_interlocutors.insert("Dummy", dummy);
-
-    // Exemple de comment on ajouterai un vrai interlocuteur
-    // auto openai = new OpenAIInterlocutor("ChatGPT-4o", this);
-    // openai->setApiKey("MA_CLÉ_API");
-    // m_interlocutors.insert("ChatGPT-4o", openai);
-
-    emit interlocutorNamesChanged();
 }
 
 QStringList ChatManager::interlocutorNames() const
@@ -70,6 +55,11 @@ void ChatManager::switchToInterlocutor(const QString &name)
 
     Interlocutor *interlocutor = m_interlocutors.value(name);
     m_chatModel->setInterlocutor(interlocutor);
+
+    InterlocutorConfig *interlocutorConfig = findConfigByName(name);
+    if (interlocutor != nullptr && interlocutorConfig != nullptr) {
+        interlocutor->setSystemPrompt(interlocutorConfig->systemPrompt());
+    }
 
     // Charger le fichier de chat correspondant
     QString chatFilePath = m_chatFilesPath + "/" + name + ".jsonl";
@@ -195,6 +185,17 @@ QStringList ChatManager::availableProviders() const
     return m_modelRegistry.availableProviders();
 }
 
+InterlocutorConfig *ChatManager::findCurrentConfig() { return m_currentConfig; }
+
+InterlocutorConfig *ChatManager::findConfigByName(const QString &configName) {
+    for(auto curConfig : m_allConfigs) {
+        if (curConfig->name() == configName)
+            m_currentConfig = curConfig;
+        return m_currentConfig;
+    }
+    return nullptr;
+}
+
 QStringList ChatManager::modelsForProvider(const QString &provider)
 {
     return m_modelRegistry.modelsForProvider(provider);
@@ -244,8 +245,8 @@ Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *conf
         interlocutor = new DummyInterlocutor(config->name(), this);
     }
     if (interlocutor) {
+        qDebug()<<"ChatManager::createInterlocutorFromConfig: setSystemPrompt"<<config->systemPrompt();
         interlocutor->setSystemPrompt(config->systemPrompt());
-        interlocutor->setAncientMemoryFileId(config->ancientMemoryFileId());
     }
     return interlocutor;
 }
