@@ -289,7 +289,6 @@ void ChatModel::checkCurationThreshold()
         triggerCuration();
     }
 }
-
 void ChatModel::onInterlocutorReply(const InterlocutorReply &reply)
 {
     qDebug()<<"ChatModel::onInterlocutorReply" << reply.text;
@@ -299,6 +298,13 @@ void ChatModel::onInterlocutorReply(const InterlocutorReply &reply)
     }
 
     handleNormalReply(reply);
+}
+void ChatModel::onInterlocutorError(const QString &message)
+{
+    qWarning() << "Chat error:" << message;
+    m_isWaitingForReply = false;
+    setIsTyping(false);
+    emit chatError(message);
 }
 
 void ChatModel::handleNormalReply(const InterlocutorReply &reply)
@@ -363,6 +369,8 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
     if (m_interlocutor) {
         disconnect(m_interlocutor, &Interlocutor::replyReady,
                    this, &ChatModel::onInterlocutorReply);
+        disconnect(m_interlocutor, &Interlocutor::errorOccurred,
+                    this, &ChatModel::onInterlocutorError);
         disconnect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded);
         disconnect(m_interlocutor,
                    &Interlocutor::fileUploadFailed,
@@ -377,6 +385,8 @@ void ChatModel::setInterlocutor(Interlocutor *interlocutor)
     if (m_interlocutor) {
         connect(m_interlocutor, &Interlocutor::replyReady,
                 this, &ChatModel::onInterlocutorReply);
+        connect(m_interlocutor, &Interlocutor::errorOccurred,
+                this, &ChatModel::onInterlocutorError);
         connect(m_interlocutor, &Interlocutor::fileUploaded, this, &ChatModel::onFileUploaded, Qt::UniqueConnection);
         connect(m_interlocutor,
                 &Interlocutor::fileUploadFailed,
