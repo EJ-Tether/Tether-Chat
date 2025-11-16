@@ -60,7 +60,7 @@ void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history,
     });
 }
 
-void DummyInterlocutor::uploadFile(const QByteArray &content, const QString &purpose)
+void DummyInterlocutor::uploadFile(QString fileName, const QByteArray &content, const QString &purpose)
 {
     qDebug() << "DummyInterlocutor: Simulating upload for purpose '" << purpose << "'...";
 

@@ -18,7 +18,7 @@ public:
                      const QStringList &attachmentFileIds = {}) override;
 
     // Implémentation des méthodes de gestion de fichiers
-    void uploadFile(const QByteArray &content, const QString &purpose) override;
+    void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) override;
     void deleteFile(const QString &fileId) override;
 
 private:

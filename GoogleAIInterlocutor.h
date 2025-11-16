@@ -23,7 +23,7 @@ public:
         const QString& ancientMemory,
         InterlocutorReply::Kind kind,
         const QStringList &attachmentFileIds) override;
-    void uploadFile(const QByteArray &content, const QString &purpose) override {
+    void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) override {
         qDebug()<<"GoogleAIInterlocutor::uploadFile:"<<content<<purpose;
     }
     void deleteFile(const QString &fileId) override {

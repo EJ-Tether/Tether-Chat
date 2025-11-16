@@ -34,7 +34,7 @@ class OpenAIInterlocutor : public Interlocutor {
      // signals:
      //     void responseReceived(const QJsonObject &response);
      //     void errorOccurred(const QString &error);
-     void uploadFile(const QByteArray &content, const QString &purpose) override;
+     void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) override;
      void deleteFile(const QString &fileId) override;
 
  private:

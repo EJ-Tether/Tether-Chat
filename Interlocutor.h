@@ -24,7 +24,7 @@ public:
         const InterlocutorReply::Kind kind,
         const QStringList &attachmentFileIds) = 0;
 
-    virtual void uploadFile(const QByteArray &content, const QString &purpose) = 0;
+    virtual void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) = 0;
     virtual void deleteFile(const QString &fileId) = 0;
     virtual void setSystemPrompt(const QString &systemPrompt) {
         m_systemPrompt = systemPrompt;

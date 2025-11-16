@@ -293,29 +293,37 @@ void ChatModel::onInterlocutorReply(const InterlocutorReply &reply)
 {
     qDebug()<<"ChatModel::onInterlocutorReply" << reply.text;
     if (reply.kind == InterlocutorReply::Kind::CurationResult) {
+        m_isCurationInProgress = false;
         handleCurationReply(reply);
         return;
     }
 
     handleNormalReply(reply);
 }
-void ChatModel::onInterlocutorError(const QString &message)
-{
-    qWarning() << "Chat error:" << message;
-    m_isWaitingForReply = false;
-    setIsTyping(false);
-    emit chatError(message);
-}
 
-void ChatModel::handleNormalReply(const InterlocutorReply &reply)
-{
-    // 1) Enlever le typing indicator
+void ChatModel::removeTypingIndicator(void) {
     if (!m_messages.isEmpty() && m_messages.last().isTypingIndicator) {
         beginRemoveRows(QModelIndex(), m_messages.count() - 1, m_messages.count() - 1);
         m_messages.removeLast();
         endRemoveRows();
     }
     setWaitingForReply(false);
+}
+
+void ChatModel::onInterlocutorError(const QString &message)
+{
+    qWarning() << "Chat error:" << message;
+    m_isWaitingForReply = false;
+    m_isCurationInProgress = false;
+    removeTypingIndicator();
+    emit chatError(message);
+}
+
+void ChatModel::handleNormalReply(const InterlocutorReply &reply)
+{
+    // 1) Enlever le typing indicator
+    removeTypingIndicator();
+
 
     // 2) Mettre à jour les compteurs de tokens avec les données propres de la reply
 
@@ -443,7 +451,7 @@ void ChatModel::triggerCuration()
     if (numMessagesToRemove > 0) {
         qDebug() << "Culling" << numMessagesToRemove << "messages from live memory.";
         beginRemoveRows(QModelIndex(), 0, numMessagesToRemove - 1);
-        endRemoveRows(); // Attention, il faut bien appeler begin/endRemoveRows AVANT de modifier la liste
+        endRemoveRows();
         rewriteChatFile();
         emit liveMemoryTokensChanged();
     } else {
@@ -452,7 +460,7 @@ void ChatModel::triggerCuration()
         return;
     }
 
-    // --- Phase 2: Préparation de la requête de résumé SANS FICHIERS ---
+    // --- Phase 2: Préparation de la requête de résumé
     QString olderMemory = loadOlderMemory();
     QString conversationToSummarize;
     for (const auto& msg : messagesToCurate) {
@@ -472,7 +480,7 @@ void ChatModel::triggerCuration()
                                   "1. The EXISTING long-term memory summary.\n"
                                   "2. The OLDER conversation transcript that needs to be archived.\n"
                                   "3. The MOST RECENT conversation transcript, which provides context on what is currently important.\n\n"
-                                  "Your goal is to produce a NEW, updated long-term memory summary that keeps the essential parts of the existing summary, but enriches it with the most important and relevant information from the older transcript, using the recent transcript as a guide to determine what matters.\n\n"
+                                  "Your goal is to produce a NEW, updated long-term memory summary that keeps the essential parts of the existing summary, but enriches it with the most important and relevant information from the older transcript, using the recent transcript as a guide to determine what matters. Don't add any comment, don't ask question, don't add anything to the summary, because your output is going to become the new summary exactly as you write it.\n\n"
                                   "--- 1. EXISTING SUMMARY ---\n" +
                                   (olderMemory.isEmpty() ? "None." : olderMemory) +
                                   "\n\n--- 2. OLDER TRANSCRIPT TO ARCHIVE ---\n" +
@@ -570,7 +578,7 @@ void ChatModel::uploadUserFile(const QUrl &fileUrl)
 
     // 2. Lancer l'upload
     // On passe un "purpose" spécial pour les fichiers utilisateur
-    m_interlocutor->uploadFile(content, "user_attachment");
+    m_interlocutor->uploadFile(fileUrl.fileName(), content, "user_attachment");
 }
 
 void ChatModel::deleteUserFile(int index)

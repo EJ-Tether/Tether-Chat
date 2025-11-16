@@ -204,7 +204,7 @@ void OpenAIInterlocutor::sendRequest(
     });
 }
 
-void OpenAIInterlocutor::uploadFile(const QByteArray &content, const QString &purpose)
+void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content, const QString &purpose)
 {
     qDebug()<<"OpenAIInterlocutor::uploadFile";
     if (m_apiKey.trimmed().isEmpty()) {
@@ -220,12 +220,12 @@ void OpenAIInterlocutor::uploadFile(const QByteArray &content, const QString &pu
     QHttpPart purposePart;
     purposePart.setHeader(QNetworkRequest::ContentDispositionHeader,
                           QVariant("form-data; name=\"purpose\""));
-    purposePart.setBody(apiPurpose);  // <-- was: purpose.toUtf8()
+    purposePart.setBody(apiPurpose);
 
     QHttpPart filePart;
     filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
-                       QVariant("form-data; name=\"file\"; filename=\"memory.txt\""));
-    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("text/plain"));
+                       QVariant("form-data; name=\"file\"; filename=\""+fileName+"\""));
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/pdf"));
     filePart.setBody(content);
 
     multiPart->append(purposePart);
