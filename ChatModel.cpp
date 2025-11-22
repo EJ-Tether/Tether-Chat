@@ -55,6 +55,8 @@ QVariant ChatModel::data(const QModelIndex &index, int role) const
         return message.role();
     case IsTypingIndicatorRole:
         return message.isTypingIndicator;
+    case IsErrorRole:
+        return message.isError();
     }
     return QVariant();
 }
@@ -69,6 +71,7 @@ QHash<int, QByteArray> ChatModel::roleNames() const
     roles[CompletionTokensRole] = "completionTokens";
     roles[RoleRole] = "role";
     roles[IsTypingIndicatorRole] = "isTypingIndicator";
+    roles[IsErrorRole] = "isError";
     return roles;
 }
 
@@ -316,6 +319,17 @@ void ChatModel::onInterlocutorError(const QString &message)
     m_isWaitingForReply = false;
     m_isCurationInProgress = false;
     removeTypingIndicator();
+    
+    // Ajouter le message d'erreur dans le chat
+    ChatMessage errorMessage(false,
+                             message,
+                             QDateTime::currentDateTime(),
+                             0,
+                             0,
+                             "system", // ou "assistant"
+                             true); // isError = true
+    addMessage(errorMessage);
+    
     emit chatError(message);
 }
 

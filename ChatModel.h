@@ -27,7 +27,8 @@ public:
         PromptTokensRole,
         CompletionTokensRole,
         RoleRole, // "user" ou "assistant"
-        IsTypingIndicatorRole
+        IsTypingIndicatorRole,
+        IsErrorRole
     };
     Q_ENUM(ChatMessageRoles)
 
@@ -111,9 +112,9 @@ private:
     int m_cumulativeTokenCost = 0;
 
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    const int BASE_LIVE_MEMORY_TOKENS = 24576 ;/* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 100000;
+    const int BASE_LIVE_MEMORY_TOKENS = 100000 ;
     // Seuil de déclenchement de la curation (par exemple, 120K)
-    const int CURATION_TRIGGER_TOKENS = 32768 ; /* Reduced for debug purposes! */ // ORIGINAL VALUE WAS : 120000;
+    const int CURATION_TRIGGER_TOKENS = 128000 ;
     void rewriteChatFile();
 
     // Gestion de la curation

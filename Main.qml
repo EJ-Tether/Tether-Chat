@@ -192,7 +192,7 @@ ApplicationWindow {
                                     radius: 12
                                     border.width: 1
                                     border.color: borderColor
-                                    color: model.isLocalMessage ? humanMessageColor : aiMessageColor
+                                    color: model.isError ? "#ffcdd2" : (model.isLocalMessage ? humanMessageColor : aiMessageColor)
                                     anchors.top: parent.top
                                     anchors.left: model.isLocalMessage ? parent.left : undefined // Ancre à gauche si humain
                                     anchors.right: model.isLocalMessage ? undefined : parent.right // Ancre à droite si IA

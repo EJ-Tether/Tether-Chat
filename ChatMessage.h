@@ -17,15 +17,15 @@ struct ChatMessage
     Q_PROPERTY(QDateTime timestamp READ timestamp WRITE setTimestamp)
     Q_PROPERTY(int promptTokens READ promptTokens WRITE setPromptTokens)
     Q_PROPERTY(int completionTokens READ completionTokens WRITE setCompletionTokens)
-    Q_PROPERTY(QString role READ role WRITE setRole) // 'user' ou 'assistant'
+    Q_PROPERTY(bool isError READ isError WRITE setIsError)
 
 public:
     // Constructeur par défaut
-    ChatMessage() : m_isLocalMessage(false), m_promptTokens(0), m_completionTokens(0), m_role("") {}
+    ChatMessage() : m_isLocalMessage(false), m_promptTokens(0), m_completionTokens(0), m_role(""), m_isError(false) {}
 
     // Constructeur complet
-    ChatMessage(bool local, const QString &txt, const QDateTime &ts, int pTokens, int cTokens, const QString &r)
-        : m_isLocalMessage(local), m_text(txt), m_timestamp(ts), m_promptTokens(pTokens), m_completionTokens(cTokens), m_role(r) {}
+    ChatMessage(bool local, const QString &txt, const QDateTime &ts, int pTokens, int cTokens, const QString &r, bool error = false)
+        : m_isLocalMessage(local), m_text(txt), m_timestamp(ts), m_promptTokens(pTokens), m_completionTokens(cTokens), m_role(r), m_isError(error) {}
 
     // Accesseurs
     bool isLocalMessage() const { return m_isLocalMessage; }
@@ -34,6 +34,7 @@ public:
     int promptTokens() const { return m_promptTokens; }
     int completionTokens() const { return m_completionTokens; }
     QString role() const { return m_role; }
+    bool isError() const { return m_isError; }
 
     // Mutateurs
     void setIsLocalMessage(bool local) { m_isLocalMessage = local; }
@@ -42,6 +43,7 @@ public:
     void setPromptTokens(int tokens) { m_promptTokens = tokens; }
     void setCompletionTokens(int tokens) { m_completionTokens = tokens; }
     void setRole(const QString &r) { m_role = r; }
+    void setIsError(bool error) { m_isError = error; }
 
     // Méthodes de sérialisation / désérialisation
     QJsonObject toJsonObject() const {
@@ -53,6 +55,7 @@ public:
         obj["completionTokens"] = m_completionTokens;
         obj["role"] = m_role;
         obj["isTypingIndicator"] = isTypingIndicator;
+        obj["isError"] = m_isError;
         return obj;
     }
 
@@ -65,6 +68,7 @@ public:
         msg.m_completionTokens = obj["completionTokens"].toInt();
         msg.m_role = obj["role"].toString();
         msg.isTypingIndicator = obj["isTypingIndicator"].toBool(false);
+        msg.m_isError = obj["isError"].toBool(false);
         return msg;
     }
     bool isTypingIndicator = false;
@@ -75,6 +79,7 @@ private:
     int m_promptTokens;
     int m_completionTokens;
     QString m_role; // "user" ou "assistant"
+    bool m_isError;
 };
 
 #endif // CHATMESSAGE_H
