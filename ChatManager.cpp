@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
+#include <QClipboard>
+#include <QGuiApplication>
 #include "DummyInterlocutor.h"
 #include "GoogleAIInterlocutor.h"
 #include "ModelInfo.h"
@@ -216,6 +218,14 @@ void ChatManager::updateConfigWithModel(const QString &modelDisplayName)
 
         m_currentConfig->setEndpointUrl(endpoint);
         m_currentConfig->setModelName(model.displayName);
+    }
+}
+
+void ChatManager::copyToClipboard(const QString &text)
+{
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    if (clipboard) {
+        clipboard->setText(text);
     }
 }
 

@@ -44,6 +44,8 @@ public:
     Q_INVOKABLE bool saveConfig(InterlocutorConfig* config); // Renvoie true si succès
     Q_INVOKABLE void deleteConfig(const QString &name);
 
+    Q_INVOKABLE void copyToClipboard(const QString &text);
+
     InterlocutorConfig* currentConfig() const;
     QStringList availableInterlocutorTypes() const;
 

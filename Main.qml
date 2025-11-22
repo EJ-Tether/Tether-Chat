@@ -197,7 +197,7 @@ ApplicationWindow {
                                     anchors.left: model.isLocalMessage ? parent.left : undefined // Ancre à gauche si humain
                                     anchors.right: model.isLocalMessage ? undefined : parent.right // Ancre à droite si IA
 
-                                    Text {
+                                    TextEdit {
                                         id: _messageText
                                         anchors.fill: parent
                                         anchors.margins: 10
@@ -205,10 +205,43 @@ ApplicationWindow {
                                         wrapMode: Text.Wrap
                                         font.pixelSize: 14
                                         color: "#333333"
+                                        readOnly: true
+                                        selectByMouse: true
                                         // Définir une largeur maximale pour que implicitHeight soit calculé correctement
                                         width: parent.width - 20 // 20 pour les marges du parent (messageBubble)
                                     }
 
+                                    // Bouton Copier (visible au survol ou toujours)
+                                    Button {
+                                        id: copyButton
+                                        text: "⎘" // Ou une icône si disponible
+                                        width: 15
+                                        height: 30
+                                        z:1
+                                        visible: false // Caché par défaut
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 5
+                                        background: Rectangle {
+                                            color: "#ffffff"
+                                            radius: 6
+                                            opacity: 0.8
+                                            border.color: "#cccccc"
+                                            z:-1
+                                        }
+                                        onClicked: {
+                                            _chatManager.copyToClipboard(model.text)
+                                        }
+                                    }
+                                    
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.NoButton // Laisser passer les clics pour la sélection
+                                        cursorShape: Qt.IBeamCursor
+                                        onEntered: copyButton.visible = true
+                                        onExited: copyButton.visible = false
+                                    }
                                 }
                                 Item {
                                     id: typingIndicator
