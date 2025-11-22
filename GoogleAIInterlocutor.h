@@ -6,6 +6,7 @@
 #include <QNetworkAccessManager>
 #include <QUrl>
 #include <QDebug>
+#include <QMimeDatabase>
 
 #include "Interlocutor.h"
 
@@ -23,12 +24,8 @@ public:
         const QString& ancientMemory,
         InterlocutorReply::Kind kind,
         const QStringList &attachmentFileIds) override;
-    void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) override {
-        qDebug()<<"GoogleAIInterlocutor::uploadFile:"<<content<<purpose;
-    }
-    void deleteFile(const QString &fileId) override {
-        qDebug()<<"GoogleAIInterlocutor::deleteFile:"<<fileId;
-    }
+    void uploadFile(QString fileName, const QByteArray &content, const QString &purpose) override;
+    void deleteFile(const QString &fileId) override;
 
 private:
     QString m_apiKey;
