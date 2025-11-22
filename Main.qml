@@ -270,10 +270,9 @@ ApplicationWindow {
                                 id: scrollView
                                 anchors { top: parent.top ; left: _filler.right }
                                 height: 150
-                                width: parent.width - 70
+                                width: parent.width - 120
                                 anchors { top: parent.top ; left: parent.left }
 
-                                //Layout.fillHeight: true
                                 clip: true
 
                                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
@@ -284,6 +283,13 @@ ApplicationWindow {
                                     width: parent.width - 70
                                     wrapMode: Text.WordWrap
                                     placeholderText: "Saisissez votre message ici..."
+
+                                    Keys.onPressed: (event) => {
+                                        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
+                                            sendMessage();
+                                            event.accepted = true;
+                                        }
+                                    }
 
                                     onContentHeightChanged: {
                                         scrollView.ScrollBar.vertical.position = 1.0;
@@ -298,10 +304,10 @@ ApplicationWindow {
 
                             Button {
                                 id: sendButton
-                                width: 60
-                                height: 30
-                                anchors { verticalCenter: parent.verticalCenter ; right: parent.right }
-                                text: "Envoi"
+                                width: 90
+                                height: 80
+                                anchors { verticalCenter: parent.verticalCenter ; right: verticalFiller.left }
+                                text: "Send\n(Ctrl+Enter)"
                                 background: Rectangle {
                                     color: sendButton.enabled ? sendButtonColor : "lightgray"
                                     radius: 6
@@ -316,6 +322,12 @@ ApplicationWindow {
 
                                 onClicked: sendMessage()
                                 enabled: messageInput.text.trim().length > 0
+                            }
+                            Item {
+                                id: verticalFiller
+                                height: 1
+                                width: 10
+                                anchors { verticalCenter: parent.verticalCenter ; right: parent.right }
                             }
                         }
 
