@@ -84,7 +84,14 @@ void ChatModel::sendMessage(const QString &messageText)
     }
 
     if (!m_interlocutor) {
-        emit chatError("Interlocutor is not set.");
+        ChatMessage errorMessage(false,
+                                 "Interlocutor is not set.",
+                                 QDateTime::currentDateTime(),
+                                 0,
+                                 0,
+                                 "system",
+                                 true);
+        addMessage(errorMessage);
         return;
     }
 
@@ -250,7 +257,6 @@ void ChatModel::clearChat()
     }
     m_liveMemoryTokens = 0;
     emit liveMemoryTokensChanged();
-    emit chatError("Chat cleared.");
 }
 
 void ChatModel::setCurrentChatFilePath(const QString &path)
@@ -329,8 +335,6 @@ void ChatModel::onInterlocutorError(const QString &message)
                              "system", // ou "assistant"
                              true); // isError = true
     addMessage(errorMessage);
-    
-    emit chatError(message);
 }
 
 void ChatModel::handleNormalReply(const InterlocutorReply &reply)

@@ -75,7 +75,6 @@ signals:
     void liveMemoryTokensChanged();
     void cumulativeTokenCostChanged();
     void chatMessageAdded(const ChatMessage &message);
-    void chatError(const QString &error);
     void curationNeeded(); // Signal pour indiquer qu'une curation est nécessaire
     void curationFinished(bool success); // Signal utile pour notifier l'UI
     void isWaitingForReplyChanged();

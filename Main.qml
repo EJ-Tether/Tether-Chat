@@ -28,15 +28,7 @@ ApplicationWindow {
         }
     }
 
-    Connections {
-        target: chatModel
-        function onChatError(message) {
-            console.warn("Chat error:", message)
-            // Afficher ici une popup ou quelque chose.
-            errorBanner.text = message
-            errorBanner.visible = true
-        }
-    }
+
 
     // 1._headerChatareaDivide: separates vertically the main window in two parts: the banner
     // containing the Tab bar on top, and the main area in the rest of the window. The nature
