@@ -645,14 +645,20 @@ ApplicationWindow {
                                 text: "Custom Instructions:"
                                 Layout.alignment: Qt.AlignTop
                             }
-                            TextArea {
-                                id: systemPromptArea
+                            ScrollView {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 200
-                                text: _chatManager && _chatManager.currentConfig ? _chatManager.currentConfig.systemPrompt : ""
-                                placeholderText: "You are a helpful assistant..."
-                                wrapMode: Text.Wrap
-                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.systemPrompt = text
+                                clip: true
+                                ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+
+                                TextArea {
+                                    id: systemPromptArea
+                                    width: parent.width // Important pour le wrapMode
+                                    text: _chatManager && _chatManager.currentConfig ? _chatManager.currentConfig.systemPrompt : ""
+                                    placeholderText: "You are a helpful assistant..."
+                                    wrapMode: Text.Wrap
+                                    onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.systemPrompt = text
+                                }
                             }
 
                             // Espace vide pour pousser les boutons en bas
