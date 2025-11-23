@@ -9,6 +9,8 @@ struct ModelInfo {
     QString displayName;      // "GPT-4o", "Gemini 1.5 Pro"
     QString internalName;     // "gpt-4o", "gemini-1.5-pro"
     QString endpointTemplate; // "https://.../%MODEL_NAME%..." (%MODEL_NAME% sera remplacé si besoin)
+    int curationTriggerTokenCount; // Seuil de déclenchement de la curation
+    int curationTargetTokenCount;  // Taille cible de la mémoire après curation
 };
 
 #endif // MODELINFO_H

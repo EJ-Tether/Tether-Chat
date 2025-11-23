@@ -110,10 +110,12 @@ private:
     int m_liveMemoryTokens = 0;
     int m_cumulativeTokenCost = 0;
 
+    Q_INVOKABLE void setCurationThresholds(int triggerTokens, int targetTokens);
+    
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    const int BASE_LIVE_MEMORY_TOKENS = 80000 ;
+    int m_curationTargetTokenCount = 80000;
     // Seuil de déclenchement de la curation (par exemple, 120K)
-    const int CURATION_TRIGGER_TOKENS = 92000 ;
+    int m_curationTriggerTokenCount = 92000;
     void rewriteChatFile();
 
     // Gestion de la curation

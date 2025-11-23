@@ -14,11 +14,27 @@ ChatModel::ChatModel(QObject *parent)
     , m_interlocutor(nullptr)
     , m_liveMemoryTokens(0)
     , m_cumulativeTokenCost(0)
+    , m_curationTargetTokenCount(80000)
+    , m_curationTriggerTokenCount(92000)
 {
     //qDebug()<<__FILE__<<__LINE__<<__PRETTY_FUNCTION__<<"CONNECT onFileUploaded fileUploadFailed";
     //if (m_interlocutor) {
     //    setInterlocutor(m_interlocutor);
     //}
+}
+
+void ChatModel::setCurationThresholds(int triggerTokens, int targetTokens)
+{
+    if (triggerTokens <= targetTokens) {
+        qWarning() << "Invalid curation thresholds: trigger (" << triggerTokens << ") must be greater than target (" << targetTokens << "). Using defaults.";
+        return;
+    }
+    m_curationTriggerTokenCount = triggerTokens;
+    m_curationTargetTokenCount = targetTokens;
+    qDebug() << "Curation thresholds updated: Trigger=" << m_curationTriggerTokenCount << ", Target=" << m_curationTargetTokenCount;
+    
+    // Check immediately if we need curation with new thresholds
+    checkCurationThreshold();
 }
 
 ChatModel::~ChatModel()
@@ -291,8 +307,8 @@ void ChatModel::updateLiveMemoryEstimate()
 
 void ChatModel::checkCurationThreshold()
 {
-    qDebug()<<"There are currently"<<m_liveMemoryTokens<<"in the live memory";
-    if (m_liveMemoryTokens >= CURATION_TRIGGER_TOKENS && !m_isCurationInProgress) {
+    qDebug()<<"There are currently"<<m_liveMemoryTokens<<"in the live memory. Trigger is"<<m_curationTriggerTokenCount;
+    if (m_liveMemoryTokens >= m_curationTriggerTokenCount && !m_isCurationInProgress) {
         qDebug() << "Curation threshold reached! Live memory size:" << m_liveMemoryTokens;
         emit curationNeeded();
         triggerCuration();
@@ -454,7 +470,7 @@ void ChatModel::triggerCuration()
     int numMessagesToRemove = 0;
 
     // LA BOUCLE DOIT ÊTRE CORRIGÉE
-    while (m_liveMemoryTokens > BASE_LIVE_MEMORY_TOKENS && numMessagesToRemove < m_messages.count()) {
+    while (m_liveMemoryTokens > m_curationTargetTokenCount && numMessagesToRemove < m_messages.count()) {
         ChatMessage msg = m_messages.first();
         messagesToCurate.append(msg);
 
