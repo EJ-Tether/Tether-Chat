@@ -51,7 +51,7 @@ void OpenAIInterlocutor::sendRequest(
 
     // 1. Prompt système principal (personnalité)
     // On utilise la copie locale m_systemPrompt, configurée par ChatManager
-    if (!m_systemPrompt.isEmpty()) {
+    if (!m_systemPrompt.isEmpty() && kind != InterlocutorReply::Kind::CurationResult) {
         QJsonObject devMessage;
         devMessage["role"] = "developer";
         QJsonArray devContent;
@@ -137,7 +137,7 @@ void OpenAIInterlocutor::sendRequest(
         // 1) Vérifier l'erreur réseau + HTTP
         if (reply->error() != QNetworkReply::NoError ||
             statusCode < 200 || statusCode >= 300) {
-            QString errMessage =                 QString("API Error %1: %2 | Body: %3")
+            QString errMessage = QString("API Error %1: %2 | Body: %3")
                     .arg(statusCode)
                     .arg(reply->errorString())
                     .arg(QString::fromUtf8(raw));

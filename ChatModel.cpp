@@ -491,12 +491,12 @@ void ChatModel::triggerCuration()
         recentContext += (msg.isLocalMessage() ? "user: " : "assistant: ") + msg.text() + "\n\n";
     }
 
-    QString curationSystemPrompt = "You are a memory curator. Your task is to create a new, single, coherent summary of a person's long-term memory by integrating new information.";
+    QString curationSystemPrompt = "You are a memory curator. Your task is to create a new, single, coherent summary of your own long-term memory as an AI by integrating new information. This is what you'll remember of the oldest messages that slip past your memory.";
 
     QList<ChatMessage> curationHistory;
     QString curationUserMessage = "Analyze the three following blocks of text:\n\n"
-                                  "1. The EXISTING long-term memory summary.\n"
-                                  "2. The OLDER conversation transcript that needs to be archived.\n"
+                                  "1. Your EXISTING long-term memory summary.\n"
+                                  "2. The OLDER conversation transcript that needs to be archived (this messages will be removed from your current context after you archived them).\n"
                                   "3. The MOST RECENT conversation transcript, which provides context on what is currently important.\n\n"
                                   "Your goal is to produce a NEW, updated long-term memory summary that keeps the essential parts of the existing summary, but enriches it with the most important and relevant information from the older transcript, using the recent transcript as a guide to determine what matters. Don't add any comment, don't ask question, don't add anything to the summary, because your output is going to become the new summary exactly as you write it.\n\n"
                                   "--- 1. EXISTING SUMMARY ---\n" +
@@ -505,6 +505,8 @@ void ChatModel::triggerCuration()
                                   conversationToSummarize +
                                   "\n\n--- 3. MOST RECENT CONTEXT ---\n" +
                                   recentContext;
+
+    qDebug()<<"curationUserMessage="<<curationUserMessage;
 
     curationHistory.append(ChatMessage(true, curationUserMessage, QDateTime::currentDateTime(), 0, 0, "user"));
 

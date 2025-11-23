@@ -111,9 +111,9 @@ private:
     int m_cumulativeTokenCost = 0;
 
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    const int BASE_LIVE_MEMORY_TOKENS = 100000 ;
+    const int BASE_LIVE_MEMORY_TOKENS = 80000 ;
     // Seuil de déclenchement de la curation (par exemple, 120K)
-    const int CURATION_TRIGGER_TOKENS = 128000 ;
+    const int CURATION_TRIGGER_TOKENS = 92000 ;
     void rewriteChatFile();
 
     // Gestion de la curation
