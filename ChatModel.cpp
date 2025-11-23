@@ -149,8 +149,8 @@ void ChatModel::addMessage(const ChatMessage &message)
     m_messages.append(message);
     endInsertRows();
 
-    // Persister le message dans le fichier jsonl si ce n'est pas un typing indicator
-    if (!message.isTypingIndicator && !m_currentChatFilePath.isEmpty()) {
+    // Persister le message dans le fichier jsonl si ce n'est pas un typing indicator ni une erreur
+    if (!message.isTypingIndicator && !message.isError() && !m_currentChatFilePath.isEmpty()) {
         QFile file(m_currentChatFilePath);
         if (file.open(QFile::Append | QFile::Text)) {
             QTextStream stream(&file);
@@ -453,7 +453,9 @@ void ChatModel::rewriteChatFile()
 
     QTextStream stream(&file);
     for (const ChatMessage &message : m_messages) {
-        stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
+        if (!message.isError()) {
+            stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
+        }
     }
     file.close();
     qDebug() << "Chat file rewritten successfully:" << m_currentChatFilePath;
