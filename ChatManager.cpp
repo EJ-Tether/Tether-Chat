@@ -61,6 +61,12 @@ void ChatManager::switchToInterlocutor(const QString &name)
     InterlocutorConfig *interlocutorConfig = findConfigByName(name);
     if (interlocutor != nullptr && interlocutorConfig != nullptr) {
         interlocutor->setSystemPrompt(interlocutorConfig->systemPrompt());
+
+        // Update curation thresholds from the registry
+        ModelInfo modelInfo = m_modelRegistry.findModel(interlocutorConfig->modelName());
+        if (modelInfo.curationTriggerTokenCount > modelInfo.curationTargetTokenCount) {
+             m_chatModel->setCurationThresholds(modelInfo.curationTriggerTokenCount, modelInfo.curationTargetTokenCount);
+        }
     }
 
     // Charger le fichier de chat correspondant
