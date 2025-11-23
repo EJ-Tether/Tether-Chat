@@ -60,7 +60,9 @@ void ChatManager::switchToInterlocutor(const QString &name)
 
     InterlocutorConfig *interlocutorConfig = findConfigByName(name);
     if (interlocutor != nullptr && interlocutorConfig != nullptr) {
-        interlocutor->setSystemPrompt(interlocutorConfig->systemPrompt());
+        interlocutor->setSystemPrompt(
+            QString("(Technical initialization) This post contains your configuration (personality prompt):\n")+
+            interlocutorConfig->systemPrompt());
 
         // Update curation thresholds from the registry
         ModelInfo modelInfo = m_modelRegistry.findModel(interlocutorConfig->modelName());
