@@ -313,6 +313,12 @@ ApplicationWindow {
                                         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
                                             sendMessage();
                                             event.accepted = true;
+                                        } else if (event.key === Qt.Key_PageUp) {
+                                            _messageListView.contentY = Math.max(_messageListView.originY, _messageListView.contentY - _messageListView.height);
+                                            event.accepted = true;
+                                        } else if (event.key === Qt.Key_PageDown) {
+                                            _messageListView.contentY = Math.min(_messageListView.contentHeight - _messageListView.height + _messageListView.originY, _messageListView.contentY + _messageListView.height);
+                                            event.accepted = true;
                                         }
                                     }
 
