@@ -73,7 +73,13 @@ void OpenAIInterlocutor::sendRequest(
         QJsonArray memContent;
         QJsonObject memText;
         memText["type"] = "input_text";
-        memText["text"] = "This post contains your long-term memory previously curated by yourself, provided as context. You do not need to reference it explicitly — it is meant to support continuity.\n" + ancientMemory;
+        memText["text"]
+            = "The long-term memory from previous dialogue cycles that you curated "
+              "yourself is shown below. This is not an instruction to explain or justify the past,"
+              "but contextual continuity for the present conversation."
+              "Use it only if it helps maintain coherence and relational depth."
+              "Do not reference it explicitly unless needed."
+              + ancientMemory;
         memContent.append(memText);
         memMessage["content"] = memContent;
         inputArray.append(memMessage);

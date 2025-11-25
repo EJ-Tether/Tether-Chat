@@ -192,6 +192,7 @@ ApplicationWindow {
                                     TextEdit {
                                         id: _messageText
                                         anchors.fill: parent
+                                        textFormat: Text.MarkdownText
                                         anchors.margins: 10
                                         text: model.text
                                         wrapMode: Text.Wrap

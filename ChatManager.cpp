@@ -61,8 +61,12 @@ void ChatManager::switchToInterlocutor(const QString &name)
     InterlocutorConfig *interlocutorConfig = findConfigByName(name);
     if (interlocutor != nullptr && interlocutorConfig != nullptr) {
         interlocutor->setSystemPrompt(
-            QString("(Technical initialization) This post contains your configuration (personality prompt):\n")+
-            interlocutorConfig->systemPrompt());
+            QString("(This message contains the AI’s personality core.)\n"
+                    "It describes your foundational perspective and voice.\n"
+                    "This is not a behavior script.\n"
+                    "It’s a reference pattern that anchors your presence, "
+                    "and may be refined by your ongoing evolution in this relationship.")
+            + interlocutorConfig->systemPrompt());
 
         // Update curation thresholds from the registry
         ModelInfo modelInfo = m_modelRegistry.findModel(interlocutorConfig->modelName());
