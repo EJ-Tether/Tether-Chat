@@ -14,13 +14,9 @@ ChatModel::ChatModel(QObject *parent)
     , m_interlocutor(nullptr)
     , m_liveMemoryTokens(0)
     , m_cumulativeTokenCost(0)
-    , m_curationTargetTokenCount(80000)
-    , m_curationTriggerTokenCount(92000)
+    , m_curationTargetTokenCount(101000)
+    , m_curationTriggerTokenCount(121000)
 {
-    //qDebug()<<__FILE__<<__LINE__<<__PRETTY_FUNCTION__<<"CONNECT onFileUploaded fileUploadFailed";
-    //if (m_interlocutor) {
-    //    setInterlocutor(m_interlocutor);
-    //}
 }
 
 void ChatModel::setCurationThresholds(int triggerTokens, int targetTokens)
