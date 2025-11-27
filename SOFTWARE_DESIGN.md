@@ -16,24 +16,24 @@ Tether-Chat is a desktop application built using the **Qt Framework** (version 6
 
 ```mermaid
 graph TD
-    subgraph Frontend [Frontend (QML)]
+    subgraph Frontend [Frontend_QML]
         UI[Main.qml]
         Views[ListView, StackLayout]
         Controls[TextArea, Buttons]
     end
 
-    subgraph Backend [Backend (C++)]
+    subgraph Backend [Backend_C++]
         CM[ChatManager]
         Model[ChatModel]
-        Int[Interlocutor (Abstract)]
+        Int[Interlocutor Abstract]
         OpenAI[OpenAIInterlocutor]
         Google[GoogleAIInterlocutor]
         Config[InterlocutorConfig]
     end
 
     subgraph Storage [Local Storage]
-        JSONL[Chat Logs (.jsonl)]
-        Mem[Long-Term Memory (.txt)]
+        JSONL[Chat Logs .jsonl]
+        Mem[Long-Term Memory .txt]
         Conf[interlocutors.json]
     end
 
