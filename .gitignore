@@ -1,5 +1,6 @@
 # C++ objects and libs
 build
+.vs
 *.slo
 *.lo
 *.o
