@@ -1,16 +1,13 @@
 #ifndef INTERLOCUTORREPLY_H
 #define INTERLOCUTORREPLY_H
 
-#include <QString>
 #include <QMetaType>
+#include <QString>
 
-struct InterlocutorReply
-{
+
+struct InterlocutorReply {
     // On utilise un enum class pour un typage plus fort
-    enum class Kind {
-        NormalMessage,
-        CurationResult
-    };
+    enum class Kind { NormalMessage, CurationResult };
 
     Kind kind = Kind::NormalMessage;
 
@@ -18,6 +15,7 @@ struct InterlocutorReply
     int inputTokens = 0;
     int outputTokens = 0;
     int totalTokens = 0; // Ajoutons le total, c'est souvent fourni
+    bool isIncomplete = false;
 };
 
 // Indispensable pour utiliser cette structure dans les signaux/slots

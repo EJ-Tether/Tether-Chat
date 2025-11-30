@@ -11,25 +11,18 @@
 #include <QUrl>
 
 OpenAIInterlocutor::OpenAIInterlocutor(QString interlocutorName,
-                                       const QString &apiKey,
-                                       const QUrl &url,
-                                       const QString &model,
-                                       QObject *parent)
-    : Interlocutor(interlocutorName, parent)
-    , m_apiKey(apiKey)
-    , m_url(url)
-    , m_model(model)
-{
-    qDebug()<<"Creating OpenAIInterlocutor url="<<url;
+                                       const QString &apiKey, const QUrl &url,
+                                       const QString &model, QObject *parent)
+    : Interlocutor(interlocutorName, parent), m_apiKey(apiKey), m_url(url),
+    m_model(model) {
+    qDebug() << "Creating OpenAIInterlocutor url=" << url;
     m_manager = new QNetworkAccessManager(this);
 }
 
-void OpenAIInterlocutor::sendRequest(
-    const QList<ChatMessage> &history,
-    const QString& ancientMemory,
-    const InterlocutorReply::Kind kind,
-    const QStringList &attachmentFileIds)
-{
+void OpenAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
+                                     const QString &ancientMemory,
+                                     const InterlocutorReply::Kind kind,
+                                     const QStringList &attachmentFileIds) {
     if (m_apiKey.trimmed().isEmpty()) {
         emit fileUploadFailed("Missing OpenAI API key.");
         return;
@@ -39,7 +32,7 @@ void OpenAIInterlocutor::sendRequest(
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
 
-    qDebug()<<"m_apiKey="<<m_apiKey;
+    qDebug() << "m_apiKey=" << m_apiKey;
 
     // --- Construction du payload JSON ---
     QJsonObject payload;
@@ -47,11 +40,12 @@ void OpenAIInterlocutor::sendRequest(
 
     QJsonArray inputArray;
 
-    qDebug()<<"m_systemMsg="<<m_systemPrompt;
+    qDebug() << "m_systemMsg=" << m_systemPrompt;
 
     // 1. Prompt système principal (personnalité)
     // On utilise la copie locale m_systemPrompt, configurée par ChatManager
-    if (!m_systemPrompt.isEmpty() && kind != InterlocutorReply::Kind::CurationResult) {
+    if (!m_systemPrompt.isEmpty() &&
+        kind != InterlocutorReply::Kind::CurationResult) {
         QJsonObject devMessage;
         devMessage["role"] = "developer";
         QJsonArray devContent;
@@ -63,7 +57,7 @@ void OpenAIInterlocutor::sendRequest(
         inputArray.append(devMessage);
     }
 
-    qDebug()<<"ancientMemory="<<ancientMemory;
+    qDebug() << "ancientMemory=" << ancientMemory;
 
     // 2. Mémoire ancienne (si elle existe)
     // On l'injecte comme un autre message "developer"
@@ -73,13 +67,14 @@ void OpenAIInterlocutor::sendRequest(
         QJsonArray memContent;
         QJsonObject memText;
         memText["type"] = "input_text";
-        memText["text"]
-            = "The long-term memory from previous dialogue cycles that you curated "
-              "yourself is shown below. This is not an instruction to explain or justify the past,"
-              "but contextual continuity for the present conversation."
-              "Use it only if it helps maintain coherence and relational depth."
-              "Do not reference it explicitly unless needed."
-              + ancientMemory;
+        memText["text"] =
+            "The long-term memory from previous dialogue cycles that you curated "
+            "yourself is shown below. This is not an instruction to explain or "
+            "justify the past,"
+            "but contextual continuity for the present conversation."
+            "Use it only if it helps maintain coherence and relational depth."
+            "Do not reference it explicitly unless needed." +
+            ancientMemory;
         memContent.append(memText);
         memMessage["content"] = memContent;
         inputArray.append(memMessage);
@@ -100,7 +95,8 @@ void OpenAIInterlocutor::sendRequest(
         inputArray.append(historyMessage);
     }
 
-    // 3) Fichiers: injectés comme un message 'user' avec des items {type: input_file, file_id: ...}
+    // 3) Fichiers: injectés comme un message 'user' avec des items {type:
+    // input_file, file_id: ...}
     //    (on déduplique au passage)
     // Déduplication simple
     QSet<QString> seen;
@@ -118,10 +114,8 @@ void OpenAIInterlocutor::sendRequest(
         QJsonArray filesContent;
 
         for (const QString &fid : uniqueFids) {
-            filesContent.append(QJsonObject{
-                {"type", "input_file"},
-                {"file_id", fid}
-            });
+            filesContent.append(
+                QJsonObject{{"type", "input_file"}, {"file_id", fid}});
         }
 
         filesMsg["content"] = filesContent;
@@ -138,16 +132,17 @@ void OpenAIInterlocutor::sendRequest(
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, kind]() {
         const QByteArray raw = reply->readAll();
-        const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const int statusCode =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
         // 1) Vérifier l'erreur réseau + HTTP
-        if (reply->error() != QNetworkReply::NoError ||
-            statusCode < 200 || statusCode >= 300) {
+        if (reply->error() != QNetworkReply::NoError || statusCode < 200 ||
+            statusCode >= 300) {
             QString errMessage = QString("API Error %1: %2 | Body: %3")
-                    .arg(statusCode)
-                    .arg(reply->errorString())
-                    .arg(QString::fromUtf8(raw));
-            qDebug()<<errMessage;
+            .arg(statusCode)
+                .arg(reply->errorString())
+                .arg(QString::fromUtf8(raw));
+            qDebug() << errMessage;
             emit errorOccurred(errMessage);
             reply->deleteLater();
             return;
@@ -165,6 +160,17 @@ void OpenAIInterlocutor::sendRequest(
         qDebug() << "réponse reçue:" << responseObj;
 
         InterlocutorReply cleanReply;
+
+        // Check for incomplete status
+        if (responseObj.value("status").toString() == "incomplete") {
+            cleanReply.isIncomplete = true;
+            qDebug() << "Response is incomplete (reason:"
+                     << responseObj.value("incomplete_details")
+                            .toObject()
+                            .value("reason")
+                            .toString()
+                     << ")";
+        }
 
         // 3) Extraire le texte
         if (responseObj.contains("output") && responseObj["output"].isArray()) {
@@ -186,9 +192,9 @@ void OpenAIInterlocutor::sendRequest(
         // 4) Usage tokens
         if (responseObj.contains("usage") && responseObj["usage"].isObject()) {
             const QJsonObject usage = responseObj["usage"].toObject();
-            cleanReply.inputTokens  = usage.value("input_tokens").toInt();
+            cleanReply.inputTokens = usage.value("input_tokens").toInt();
             cleanReply.outputTokens = usage.value("output_tokens").toInt();
-            cleanReply.totalTokens  = usage.value("total_tokens").toInt();
+            cleanReply.totalTokens = usage.value("total_tokens").toInt();
         }
 
         qDebug() << "Parsed reply text:" << cleanReply.text;
@@ -202,7 +208,7 @@ void OpenAIInterlocutor::sendRequest(
         reply->deleteLater();
     });
 
-    QTimer::singleShot(REQUEST_TIMEOUT_MS, reply, [this, reply](){
+    QTimer::singleShot(REQUEST_TIMEOUT_MS, reply, [this, reply]() {
         if (reply && reply->isRunning()) {
             qWarning() << "Request timed out after" << REQUEST_TIMEOUT_MS << "ms.";
             reply->abort();
@@ -210,11 +216,12 @@ void OpenAIInterlocutor::sendRequest(
     });
 }
 
-void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content, const QString &purpose)
-{
-    qDebug()<<"OpenAIInterlocutor::uploadFile";
+void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content,
+                                    const QString &purpose) {
+    qDebug() << "OpenAIInterlocutor::uploadFile";
     if (m_apiKey.trimmed().isEmpty()) {
-        emit fileUploadFailed("OpenAIInterlocutor::uploadFile: Missing OpenAI API key.");
+        emit fileUploadFailed(
+            "OpenAIInterlocutor::uploadFile: Missing OpenAI API key.");
         return;
     }
 
@@ -229,9 +236,11 @@ void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content,
     purposePart.setBody(apiPurpose);
 
     QHttpPart filePart;
-    filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
-                       QVariant("form-data; name=\"file\"; filename=\""+fileName+"\""));
-    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/pdf"));
+    filePart.setHeader(
+        QNetworkRequest::ContentDispositionHeader,
+        QVariant("form-data; name=\"file\"; filename=\"" + fileName + "\""));
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader,
+                       QVariant("application/pdf"));
     filePart.setBody(content);
 
     multiPart->append(purposePart);
@@ -241,13 +250,14 @@ void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content,
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
 
-    qDebug()<<"Post upload user file request:"<<multiPart;
+    qDebug() << "Post upload user file request:" << multiPart;
 
     QNetworkReply *reply = m_manager->post(request, multiPart);
     multiPart->setParent(reply);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, purpose]() {
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const int status =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QByteArray raw = reply->readAll();
 
         if (reply->error() == QNetworkReply::NoError) {
@@ -255,32 +265,33 @@ void OpenAIInterlocutor::uploadFile(QString fileName, const QByteArray &content,
             const QJsonObject obj = doc.object();
             const QString fileId = obj.value("id").toString();
             if (!fileId.isEmpty()) {
-                qDebug() << "File uploaded successfully. HTTP" << status << "ID:" << fileId;
+                qDebug() << "File uploaded successfully. HTTP" << status
+                         << "ID:" << fileId;
                 emit fileUploaded(fileId, purpose); // <-- on réémet le purpose interne
             } else {
-                qWarning() << "File upload: missing 'id' in response. HTTP" << status << "Body:" << raw;
+                qWarning() << "File upload: missing 'id' in response. HTTP" << status
+                           << "Body:" << raw;
                 emit fileUploadFailed("Could not get File ID from API response.");
             }
         } else {
             qWarning() << "File upload API error. HTTP" << status
-                       << "QtErr:" << reply->errorString()
-                       << "Body:" << raw;
+                       << "QtErr:" << reply->errorString() << "Body:" << raw;
             emit fileUploadFailed(reply->errorString());
         }
         reply->deleteLater();
     });
-    //QTimer::singleShot(30000, reply, [reply]() {
-    //    if (reply->isRunning()) {
-    //        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    //        reply->abort();
-    //        qWarning() << "Request timed out. Status code="<<statusCode;
-    //    }
-    //});
-    //reply->deleteLater();
+    // QTimer::singleShot(30000, reply, [reply]() {
+    //     if (reply->isRunning()) {
+    //         int statusCode =
+    //         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    //         reply->abort();
+    //         qWarning() << "Request timed out. Status code="<<statusCode;
+    //     }
+    // });
+    // reply->deleteLater();
 }
 
-void OpenAIInterlocutor::deleteFile(const QString &fileId)
-{
+void OpenAIInterlocutor::deleteFile(const QString &fileId) {
     QUrl url("https://api.openai.com/v1/files/" + fileId);
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
