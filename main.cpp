@@ -68,13 +68,17 @@ int main(int argc, char *argv[])
     }
 
     // --- Démarrage de l'engine QML ---
+    const QUrl url(QStringLiteral("qrc:/qt/qml/Tether/Main.qml"));
     QObject::connect(
         &engine,
-        &QQmlApplicationEngine::objectCreationFailed,
+        &QQmlApplicationEngine::objectCreated,
         &app,
-        []() { QCoreApplication::exit(-1); },
+        [url](QObject *obj, const QUrl &objUrl) {
+            if (!obj && url == objUrl)
+                QCoreApplication::exit(-1);
+        },
         Qt::QueuedConnection);
-    engine.loadFromModule("Tether", "Main");
+    engine.load(url);
 
     return app.exec();
 }

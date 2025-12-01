@@ -417,10 +417,19 @@ void ChatModel::handleNormalReply(const InterlocutorReply &reply) {
   // 5) Recalculer liveMemoryTokens + checkCurationThreshold()
   // L'estimation n'est plus nécessaire ici, la valeur exacte vient d'être mise
   // à jour. On lance juste la vérification.
-  checkCurationThreshold();
+  if (!reply.isIncomplete) {
+    checkCurationThreshold();
+  }
 }
 
 void ChatModel::handleCurationReply(const InterlocutorReply &reply) {
+  if (reply.isIncomplete) {
+    qWarning() << "Curation failed: response was incomplete (reason:"
+               << reply.text << "). Discarding to prevent memory corruption.";
+    emit curationFinished(false);
+    return;
+  }
+
   const QString newSummary = reply.text.trimmed();
   if (newSummary.isEmpty()) {
     qWarning() << "Curation failed: empty summary.";
