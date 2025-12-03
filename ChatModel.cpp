@@ -506,12 +506,9 @@ void ChatModel::triggerCuration() {
     qDebug() << "Starting curation process...";
     m_isCurationInProgress = true;
 
-    // --- Phase 1: Prélèvement (logique existante, mais attention à la boucle)
-    // ---
     QList<ChatMessage> messagesToCurate;
     int numMessagesToRemove = 0;
 
-    // LA BOUCLE DOIT ÊTRE CORRIGÉE
     while (m_liveMemoryTokens > m_curationTargetTokenCount &&
            numMessagesToRemove < m_messages.count()) {
         ChatMessage msg = m_messages.first();
