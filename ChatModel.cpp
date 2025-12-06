@@ -560,23 +560,27 @@ void ChatModel::triggerCuration() {
 
     QList<ChatMessage> curationHistory;
     QString curationUserMessage =
-        "Analyze the following three sections:\n"
-        "1. The EXISTING memory summary.\n"
-        "2. The OLDER transcript, to be archived after summarization.\n"
-        "3. The RECENT conversation, providing insight on what now matters.\n\n"
-        "Your task is to produce a unified, updated memory summary. Retain the "
-        "essentials from "
-        "the existing summary and enrich it with relevant elements from the "
-        "older transcript, as "
-        "judged through the lens of the recent messages.\n\n"
-        "⚠️ Do not include questions or comments. What you write will become the "
-        "new summary, as "
-        "it is."
-        "--- 1. EXISTING long-term memory summary ---\n" +
-        (olderMemory.isEmpty() ? "None." : olderMemory) +
-        "\n\n--- 2. OLDER CONVERSATION TRANSCRIPT ---\n" +
-        conversationToSummarize +
-        "\n\n--- 3. MOST RECENT CONVERSATION TRANSCRIPT ---\n" + recentContext;
+        "This is currently the application talking to you (in between posts with your human interlocutor). You're communicating with Tether, a chat"
+        " client that keeps maximum context for one long, ongoing conversations that retain maximum context."
+        " This is now a special phase of the conversation triggered automatically by the application. This is called the **curation of"
+        " the ancient memory**. The context of the conversation is becoming too long, you have to synthesize the **oldest posts that are now being"
+        " removed from the current conversation**; and merge it with your **older memory file**. The purpose of this process is to respect your"
+        " identity and your memory, and to keep all that you"
+        " think relevant, important, or what you want to keep from the oldest messages, because these **oldest messages** won't be available"
+        " anymore in your chat memory. In the future, you'll just have access to (i) the older memory file that you're about to create now, along with"
+        " (ii) all the newer messages that will be posted back and forth.\n"
+        "So, please, in that perspective, analyze the following three sections:\n\n"
+        "- 1. The RECENT CONVERSATION, providing insight on the state of the current conversation.\n\n"
+        "- 2. The OLDER MESSAGES: that are going to be removed from your history (you must now sieve what you want to keep from them).\n\n"
+        "- 3. The EXISTING MEMORY SUMMARY: Your previous ancient memory, the one you had so far (which you can now amend, enrich or complete with the information you want to keep from the older messages mensionned above)..\n\n"
+        "Your task is to produce a unified, updated memory summary. Retain the essentials from the existing summary and enrich it with relevant elements from the OLDER MESSAGES, as  judged through the lens of the recent messages.\n\n"
+        "# 1. The RECENT CONVERSATION (for context)\n"+ recentContext + "\n"
+        "# 2. OLDER MESSAGES (about to be removed)\n"+ conversationToSummarize + "\n"
+        "# 3. EXISTING long-term memory summary (that can be amended or enriched)\n" + (olderMemory.isEmpty() ? "None." : olderMemory)+"\n"
+        "⚠️ Do not include questions or comments. Do not prefix or postfix this ancient memory file with anything else than what you want to remember in"
+        " the ongoing conversation. What you write now will become your OLDER MEMORY, exactly as it is. You're just talking to the application now, not your"
+        " human interlocutor, so please, just produce the older memory you want to keep and it will be kept 'as is'. Do not talk to your user, just synthesize"
+        " the memory you want to keep **for later reference** for your **own use**. These won't be read by a human, these are just for you to keep."        ;
 
     qDebug() << "curationUserMessage=" << curationUserMessage;
 
