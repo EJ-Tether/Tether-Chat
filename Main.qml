@@ -226,7 +226,7 @@ ApplicationWindow {
                                             _chatManager.copyToClipboard(model.text)
                                         }
                                     }
-                                    
+
                                     MouseArea {
                                         anchors.fill: parent
                                         hoverEnabled: true
@@ -387,35 +387,44 @@ ApplicationWindow {
                                         model: _chatManager.chatModel.managedFiles
                                         spacing: 5
 
-                                        delegate: Frame {
-                                            width: parent.width
-                                            height: 30
+                                        delegate: Rectangle {
+                                            width: parent.width - 120
+                                            height: 40
+                                            color: "transparent"
+                                            border.color: "#E0E0E0"
+                                            border.width: 1
+                                            radius: 4
 
                                             RowLayout {
                                                 anchors.fill: parent
-                                                anchors.leftMargin: 5
-                                                anchors.rightMargin: 5
+                                                anchors.margins: 5
 
                                                 BusyIndicator {
                                                     running: model.status === 0 // ManagedFile.Uploading
                                                     visible: running
+                                                    Layout.preferredHeight: 20
+                                                    Layout.preferredWidth: 20
                                                 }
 
                                                 Label {
                                                     text: "✅"
                                                     visible: model.status === 1 // ManagedFile.Ready
                                                     font.pixelSize: 16
+                                                    verticalAlignment: Text.AlignVCenter
                                                 }
 
                                                 Label {
                                                     text: model.fileName
                                                     elide: Text.ElideRight
                                                     Layout.fillWidth: true
+                                                    verticalAlignment: Text.AlignVCenter
                                                 }
 
                                                 Button {
                                                     text: "✕"
                                                     flat: true
+                                                    Layout.preferredWidth: 30
+                                                    Layout.preferredHeight: 30
                                                     onClicked: {
                                                         _chatManager.chatModel.deleteUserFile(index)
                                                     }
