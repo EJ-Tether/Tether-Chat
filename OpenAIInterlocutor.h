@@ -42,7 +42,7 @@ private:
     QString m_apiKey;
     QString m_model;
     QNetworkAccessManager *m_manager;
-    const int REQUEST_TIMEOUT_MS = 100000;
+    const int REQUEST_TIMEOUT_MS = 360000;
     QMap<QNetworkReply *, QTimer *> m_requestTimers;
 };
 // End source file OpenAIInterlocutor.h
