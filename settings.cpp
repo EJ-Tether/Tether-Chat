@@ -7,18 +7,17 @@ Settings::Settings() {}
 
 QString Settings::lastUsedInterlocutor() const
 {
-    // On lit la valeur depuis QSettings. Si la clé n'existe pas, on renvoie une chaîne vide.
+    // Read the value from QSettings. If the key does not exist, return an empty string.
     return m_settings.value(KEY_LAST_INTERLOCUTOR, "").toString();
 }
 
 void Settings::setLastUsedInterlocutor(const QString &name)
 {
-    // On vérifie si la valeur a réellement changé pour ne pas écrire sur le disque inutilement.
+    // We check whether the value has actually changed so as not to write to the disk unnecessarily.
     if (lastUsedInterlocutor() != name) {
-        // On écrit la nouvelle valeur dans QSettings.
-        // QSettings s'occupe de la sauvegarder sur le disque de manière atomique.
+        // Write the new value to QSettings.
         m_settings.setValue(KEY_LAST_INTERLOCUTOR, name);
-        emit lastUsedInterlocutorChanged(); // On notifie que la valeur a changé.
+        emit lastUsedInterlocutorChanged(); // we notify that the value has changed
     }
 }
 // End source file settings.cpp
