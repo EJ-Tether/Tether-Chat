@@ -124,9 +124,9 @@ public:
 
 private:
     // Seuil de tokens pour la mémoire active (par exemple, 100K)
-    int m_curationTargetTokenCount = 100000;
+    int m_curationTargetTokenCount = 85000;
     // Seuil de déclenchement de la curation (par exemple, 120K)
-    int m_curationTriggerTokenCount = 120000;
+    int m_curationTriggerTokenCount = 100000;
     void rewriteChatFile();
 
     // Gestion de la curation

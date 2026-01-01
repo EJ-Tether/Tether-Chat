@@ -14,7 +14,7 @@
 ChatModel::ChatModel(QObject *parent)
     : QAbstractListModel(parent), m_interlocutor(nullptr),
       m_liveMemoryTokens(0), m_cumulativeTokenCost(0),
-      m_curationTargetTokenCount(101000), m_curationTriggerTokenCount(121000),
+      m_curationTargetTokenCount(85001), m_curationTriggerTokenCount(100001),
       m_expectingContinuation(false) {}
 
 void ChatModel::setCurationThresholds(int triggerTokens, int targetTokens) {
@@ -505,7 +505,7 @@ void ChatModel::rewriteChatFile() {
 void ChatModel::triggerCuration() {
   if (m_isCurationInProgress)
     return;
-  qDebug() << "Starting curation process...";
+  qDebug() << "Starting curation process... TargetTokens=" << m_curationTargetTokenCount;
   m_isCurationInProgress = true;
 
   QList<ChatMessage> messagesToCurate;
@@ -516,7 +516,12 @@ void ChatModel::triggerCuration() {
     ChatMessage msg = m_messages.first();
     messagesToCurate.append(msg);
 
-    int msgTokens = msg.promptTokens() + msg.completionTokens();
+    int msgTokens = 0;
+    if (msg.role() == "assistant")
+        msgTokens = msg.completionTokens();
+    else
+        msgTokens = msg.promptTokens();
+
     if (msgTokens == 0)
       msgTokens = msg.text().length() / 4;
 
