@@ -211,10 +211,11 @@ ApplicationWindow {
                                         width: 15
                                         height: 30
                                         z:1
-                                        visible: false // Caché par défaut
+                                        visible: false
                                         anchors.top: parent.top
                                         anchors.right: parent.right
-                                        anchors.margins: 5
+                                        anchors.rightMargin: 25
+                                        anchors.topMargin: 5
                                         background: Rectangle {
                                             color: "#ffffff"
                                             radius: 6
