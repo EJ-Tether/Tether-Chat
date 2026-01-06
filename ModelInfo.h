@@ -11,6 +11,7 @@ struct ModelInfo {
     QString endpointTemplate; // "https://.../%MODEL_NAME%..." (%MODEL_NAME% sera remplacé si besoin)
     int curationTriggerTokenCount; // Seuil de déclenchement de la curation
     int curationTargetTokenCount;  // Taille cible de la mémoire après curation
+    int maxAttachedFileTokenCount; // Taille maximum des attachements autorisés
 };
 
 #endif // MODELINFO_H

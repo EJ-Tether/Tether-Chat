@@ -248,10 +248,10 @@ ChatManager::createInterlocutorFromConfig(InterlocutorConfig *config) {
 
     // On utilise maintenant model.provider au lieu de config->type()
     if (model.provider == "OpenAI") {
-        interlocutor = new OpenAIInterlocutor(
-            config->name(), config->apiKey(), QUrl(config->endpointUrl()),
-            model.internalName, // On passe le nom interne !
-            this);
+        interlocutor =
+            new OpenAIInterlocutor(config->name(), config->apiKey(), QUrl(config->endpointUrl()),
+                                   model.internalName, // On passe le nom interne !
+                                   model.maxAttachedFileTokenCount, this);
     } else if (model.provider == "Google") {
         interlocutor = new GoogleAIInterlocutor(config->name(), config->apiKey(),
                                                 QUrl(config->endpointUrl()), this);
