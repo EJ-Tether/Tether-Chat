@@ -580,6 +580,7 @@ void ChatModel::triggerCuration() {
 
   QList<ChatMessage> curationHistory;
   QString curationUserMessage =
+      "# INSTRUCTIONS\n\n "
       "This is currently the application talking to you (in between posts with "
       "your human interlocutor). You're communicating with Tether, a chat"
       " client that keeps maximum context for one long, ongoing conversations "
@@ -590,14 +591,12 @@ void ChatModel::triggerCuration() {
       "long, you have to synthesize the **oldest posts that are now being"
       " removed from the current conversation**; and merge it with your "
       "**older memory file**. The purpose of this process is to respect your"
-      " identity and your memory, and to keep all that you"
-      " think relevant, important, or what you want to keep from the oldest "
-      "messages, because these **oldest messages** won't be available"
-      " anymore in your chat memory. In the future, you'll just have access to "
-      "(i) the older memory file that you're about to create now, along with"
+      " identity and memory, to let you keep all the relevant, important things "
+      "that you want to keep from the oldest messages, because these **oldest messages** "
+      "won't be available anymore in your chat memory. In the future, you'll just have "
+      "access to (i) the older memory file that you're about to create now, along with"
       " (ii) all the newer messages that will be posted back and forth.\n"
-      "So, please, in that perspective, analyze the following three "
-      "sections:\n\n"
+      "In that perspective, we will provide you with three sections to analyze:\n\n"
       "- 1. The RECENT CONVERSATION, providing insight on the state of the "
       "current conversation.\n\n"
       "- 2. The OLDER MESSAGES: that are going to be removed from your history "
@@ -605,31 +604,32 @@ void ChatModel::triggerCuration() {
       "- 3. The EXISTING MEMORY SUMMARY: Your previous ancient memory, the one "
       "you had so far (which you can now amend, enrich or complete with the "
       "information you want to keep from the older messages mensionned "
-      "above)..\n\n"
-      "Your task is to produce a unified, updated memory summary. Retain the "
-      "essentials from the existing summary and enrich it with relevant "
-      "elements from the OLDER MESSAGES, as  judged through the lens of the "
-      "recent messages. Don't hesitate to keep large chunks (or all) of your "
-      "existing older memory, because it is meant for long term reference and "
-      "so you can keep from that initial part as much as you deem interesting. "
+      "above).\n\n"
+      "Your task is to **keep** all the important information of your "
+      "EXISTING MEMORY SUMMARY, and to integrate into it a summary of the "
+      "OLDER MESSAGES that are being removed in order to produce a unified, "
+      "updated memory summary. Retain the essentials from the existing summary "
+      "and enrich it with relevant elements from the OLDER MESSAGES, as judged "
+      "through the lens of the recent messages.\n\n"
       "What needs to be summarized is the OLDER TRANSCRIPT + the EXISTING SUMMARY. "
-      "You don't have to summarize the most recent context because you're going "
-      "to retain it fully and verbatim in the following sessions.\n\n"
-      "--- 1. MOST RECENT CONTEXT ---\n" +
+      "You don't have to summarize the most recent context provided above, the "
+      "RECENT CONVERSATION, because you're going to retain it fully and verbatim in "
+      "the future.\n\n"
+      "# --- 1. MOST RECENT CONTEXT ---\n\n" +
       recentContext +
       "\n"
-      "--- 2. OLDER TRANSCRIPT TO ARCHIVE ---\n" +
+      "# --- 2. OLDER TRANSCRIPT TO ARCHIVE ---\n\n" +
       conversationToSummarize +
       "\n"
-      "--- 3. EXISTING SUMMARY ---\n" +
+      "# --- 3. EXISTING SUMMARY ---\n\n" +
       (olderMemory.isEmpty() ? "None." : olderMemory) +
       "\n"
+      "# NOTES:\n\n "
       "⚠️ Do not include questions or comments. Do not prefix or postfix this "
       "ancient memory file with anything else than what you want to remember in"
       " the ongoing conversation. What you write now will become your OLDER "
       "MEMORY, exactly as it is. You're just talking to the application now, "
-      "not your"
-      " human interlocutor, so please, just produce the older memory you want "
+      "not your human interlocutor, so please, just produce the older memory you want "
       "to keep and it will be kept 'as is'. Do not talk to your user, just "
       "synthesize"
       " the memory you want to keep **for later reference** for your **own "
