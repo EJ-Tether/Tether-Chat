@@ -126,7 +126,7 @@ bool ChatManager::saveConfig(InterlocutorConfig *config) {
 
     // Vérifier si une config avec ce nom existe déjà
     InterlocutorConfig *existingConfig = nullptr;
-    for (auto c : m_allConfigs) {
+    for (const auto c : m_allConfigs) {
         if (c->name() == config->name()) {
             existingConfig = c;
             break;
@@ -204,7 +204,7 @@ QStringList ChatManager::availableProviders() const {
 InterlocutorConfig *ChatManager::findCurrentConfig() { return m_currentConfig; }
 
 InterlocutorConfig *ChatManager::findConfigByName(const QString &configName) {
-    for (auto curConfig : m_allConfigs) {
+    for (const auto curConfig : m_allConfigs) {
         if (curConfig->name() == configName) {
             m_currentConfig = curConfig;
             return m_currentConfig;
