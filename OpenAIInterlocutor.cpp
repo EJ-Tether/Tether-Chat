@@ -307,7 +307,7 @@ void OpenAIInterlocutor::checkAttachmentTokens(
         return;
     }
 
-    QUrl url("https://api.openai.com/v1/responses/token_count");
+    QUrl url("https://api.openai.com/v1/responses/input_tokens");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
@@ -339,6 +339,7 @@ void OpenAIInterlocutor::checkAttachmentTokens(
 
     qDebug() << "Checking attachment token count...";
     QNetworkReply *reply = m_manager->post(request, data);
+    qDebug()<<"Posting token check request:"<<data;
 
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, callback]()
@@ -354,8 +355,9 @@ void OpenAIInterlocutor::checkAttachmentTokens(
                     callback(false, 0, err);
                     return;
                 }
-
-                QJsonDocument jsonDoc = QJsonDocument::fromJson(reply->readAll());
+                QByteArray data = reply->readAll();
+                qDebug()<<"response received:"<<data;
+                QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
                 QJsonObject responseObj = jsonDoc.object();
 
                 if (!responseObj.contains("object") ||
