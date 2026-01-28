@@ -2,6 +2,7 @@
 #include "ChatModel.h"
 #include "ChatManager.h"
 #include "InterlocutorConfig.h"
+#include <QSettings>
 #include <QDebug>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -20,12 +21,16 @@ ChatModel::ChatModel(QObject *parent)
     , m_expectingContinuation(false)
     , m_extendedContextEnabled(false)
 {
+    QSettings settings;
+    m_extendedContextEnabled = settings.value("chat/extendedContextEnabled", false).toBool();
 }
 
 void ChatModel::setExtendedContextEnabled(bool enabled)
 {
     if (m_extendedContextEnabled != enabled) {
         m_extendedContextEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/extendedContextEnabled", enabled);
         emit extendedContextEnabledChanged();
         checkCurationThreshold();
     }
