@@ -83,7 +83,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
 
-    qDebug() << "m_apiKey=" << m_apiKey;
+    // qDebug() << "m_apiKey=" << m_apiKey;
 
     // --- Construction du payload JSON ---
     QJsonObject payload;
@@ -91,7 +91,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
 
     QJsonArray inputArray;
 
-    qDebug() << "m_systemMsg=" << m_systemPrompt;
+    // qDebug() << "m_systemMsg=" << m_systemPrompt;
 
     // 1. Prompt système principal (personnalité)
     // On utilise la copie locale m_systemPrompt, configurée par ChatManager
@@ -108,7 +108,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
         inputArray.append(devMessage);
     }
 
-    qDebug() << "ancientMemory=" << ancientMemory;
+    // qDebug() << "ancientMemory=" << ancientMemory;
 
     // 2. Mémoire ancienne (si elle existe)
     // On l'injecte comme un autre message "developer"
@@ -179,8 +179,8 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
 
     payload["input"] = inputArray;
 
-    qDebug().noquote() << "Sending JSON to OpenAI /v1/responses:\n"
-                       << QJsonDocument(payload).toJson(QJsonDocument::Indented);
+    // qDebug().noquote() << "Sending JSON to OpenAI /v1/responses:\n"
+    //                    << QJsonDocument(payload).toJson(QJsonDocument::Indented);
 
     QByteArray data = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_manager->post(request, data);
@@ -216,7 +216,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
             }
 
             const QJsonObject responseObj = jsonDoc.object();
-            qDebug() << "réponse reçue:" << responseObj;
+            // qDebug() << "réponse reçue:" << responseObj;
 
             InterlocutorReply cleanReply;
 
@@ -275,7 +275,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
                 cleanReply.totalTokens = cleanReply.inputTokens + cleanReply.outputTokens;
             }
 
-            qDebug() << "Parsed reply text:" << cleanReply.text;
+            // qDebug() << "Parsed reply text:" << cleanReply.text;
             qDebug() << "Usage: in=" << cleanReply.inputTokens << "out=" << cleanReply.outputTokens
                      << "tot=" << cleanReply.totalTokens;
 
@@ -356,7 +356,7 @@ void OpenAIInterlocutor::checkAttachmentTokens(
                     return;
                 }
                 QByteArray data = reply->readAll();
-                qDebug()<<"response received:"<<data;
+                // qDebug()<<"response received:"<<data;
                 QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
                 QJsonObject responseObj = jsonDoc.object();
 

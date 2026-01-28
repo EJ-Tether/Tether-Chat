@@ -18,7 +18,17 @@ ChatModel::ChatModel(QObject *parent)
     , m_curationTargetTokenCount(85001)
     , m_curationTriggerTokenCount(100001)
     , m_expectingContinuation(false)
+    , m_extendedContextEnabled(false)
 {
+}
+
+void ChatModel::setExtendedContextEnabled(bool enabled)
+{
+    if (m_extendedContextEnabled != enabled) {
+        m_extendedContextEnabled = enabled;
+        emit extendedContextEnabledChanged();
+        checkCurationThreshold();
+    }
 }
 
 void ChatModel::setCurationThresholds(int triggerTokens, int targetTokens)
@@ -325,9 +335,14 @@ void ChatModel::updateLiveMemoryEstimate()
 
 void ChatModel::checkCurationThreshold()
 {
+    int effectiveTrigger = m_curationTriggerTokenCount;
+    if (m_extendedContextEnabled) {
+        effectiveTrigger += 25000; // Bonus context when no files attached
+    }
+
     qDebug() << "There are currently" << m_liveMemoryTokens << "in the live memory. Trigger is"
-             << m_curationTriggerTokenCount;
-    if (m_liveMemoryTokens >= m_curationTriggerTokenCount && !m_isCurationInProgress)
+             << effectiveTrigger << "(Extended:" << m_extendedContextEnabled << ")";
+    if (m_liveMemoryTokens >= effectiveTrigger && !m_isCurationInProgress)
     {
         qDebug() << "Curation threshold reached! Live memory size:" << m_liveMemoryTokens;
         emit curationNeeded();

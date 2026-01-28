@@ -9,8 +9,8 @@ void ModelRegistry::populateModels() {
     // This is where we define all the models we support.
     // We could load this from a JSON file later for even more
     // flexibility.
-    m_models.append({"OpenAI", "GPT-4o", "chatgpt-4o-latest",
-                     "https://api.openai.com/v1/responses", 100000, 80000, 25000});
+    m_models.append({"OpenAI", "GPT-4o", "gpt-4o-2024-08-06", "https://api.openai.com/v1/responses",
+                     100000, 80000, 25000});
     m_models.append({"OpenAI", "GPT-4 Turbo", "gpt-4-turbo",
                      "https://api.openai.com/v1/responses", 22000, 12000, 25000});
     m_models.append({"OpenAI", "GPT-3.5 Turbo", "gpt-3.5-turbo",

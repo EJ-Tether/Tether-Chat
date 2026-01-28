@@ -69,7 +69,16 @@ ApplicationWindow {
                 Layout.fillWidth: true
             }
             Label {
-                text: "Session cost: " + _chatManager.chatModel ? (_chatManager.chatModel.cumulativeTokenCost + " tokens"): ""
+                text: "Session cost: " + (_chatManager.chatModel ? (_chatManager.chatModel.cumulativeTokenCost + " tokens"): "")
+            }
+            CheckBox {
+                id: extendedContextCheckbox
+                text: "Extended context (no files)"
+                checked: _chatManager.chatModel ? _chatManager.chatModel.extendedContextEnabled : false
+                onCheckedChanged: {
+                    if (_chatManager.chatModel)
+                        _chatManager.chatModel.extendedContextEnabled = checked
+                }
             }
             Button {
                 id: _displayLicence
@@ -369,6 +378,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 150
                             Layout.topMargin: 5
+                            visible: !_chatManager.chatModel || !_chatManager.chatModel.extendedContextEnabled
 
                             ColumnLayout {
                                 anchors.fill: parent

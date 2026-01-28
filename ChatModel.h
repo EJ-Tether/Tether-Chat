@@ -149,6 +149,16 @@ private:
     QList<ManagedFile *> m_managedFiles;
     void removeTypingIndicator();
     bool m_expectingContinuation = false;
+
+    // Extended context without attached files
+    bool m_extendedContextEnabled = false;
+    Q_PROPERTY(bool extendedContextEnabled READ extendedContextEnabled WRITE setExtendedContextEnabled NOTIFY extendedContextEnabledChanged)
+public:
+    bool extendedContextEnabled() const { return m_extendedContextEnabled; }
+    void setExtendedContextEnabled(bool enabled);
+
+signals:
+    void extendedContextEnabledChanged();
 };
 
 #endif // CHATMODEL_H
