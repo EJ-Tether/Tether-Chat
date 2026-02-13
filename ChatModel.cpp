@@ -341,8 +341,13 @@ void ChatModel::updateLiveMemoryEstimate()
 void ChatModel::checkCurationThreshold()
 {
     int effectiveTrigger = m_curationTriggerTokenCount;
-    if (m_extendedContextEnabled) {
-        effectiveTrigger += 25000; // Bonus context when no files attached
+
+    if (m_extendedContextEnabled)
+    {
+        // TBD: Must be activated or deactivated depending on the model.
+        // i.e. never activated on models without attached files!
+        // Commented for now for use with DeepSeek chat/completion
+        // effectiveTrigger += 25000; // Bonus context when no files attached
     }
 
     qDebug() << "There are currently" << m_liveMemoryTokens << "in the live memory. Trigger is"
