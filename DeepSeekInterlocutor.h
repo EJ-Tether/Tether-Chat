@@ -28,5 +28,5 @@ private:
     QString m_apiKey;
     QString m_model;
     QNetworkAccessManager *m_manager;
-    const int REQUEST_TIMEOUT_MS = 500000;
+    const int REQUEST_TIMEOUT_MS = 800000;
 };
