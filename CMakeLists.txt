@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick)
 find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Gui)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -51,6 +52,7 @@ target_link_libraries(appTether
     PRIVATE Qt6::Quick
 )
 target_link_libraries(appTether PRIVATE Qt6::Core)
+target_link_libraries(appTether PRIVATE Qt6::Gui)
 
 include(GNUInstallDirs)
 install(TARGETS appTether
