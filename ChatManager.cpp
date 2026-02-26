@@ -8,8 +8,11 @@
 #include <QClipboard>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QGuiApplication>
+#include <QImage>
 #include <QStandardPaths>
+#include <QUrl>
 
 ChatManager::ChatManager(QObject *parent)
     : QObject(parent)
@@ -99,6 +102,9 @@ void ChatManager::switchToInterlocutor(const QString &name)
 
     m_activeInterlocutorName = name;
     emit activeInterlocutorNameChanged(m_activeInterlocutorName);
+
+    // Mettre à jour les chemins d'images du personnage actif
+    refreshActiveImagePaths(name);
 }
 
 InterlocutorConfig *ChatManager::currentConfig() const
@@ -280,6 +286,86 @@ void ChatManager::copyToClipboard(const QString &text)
     {
         clipboard->setText(text);
     }
+}
+
+// ── Image de personnage ──────────────────────────────────────────────────────
+
+static const QStringList kImageExtensions = {".jpg", ".png"};
+
+// Retourne le chemin absolu vers l'image d'index 'index' (1 ou 2)
+// de l'interlocuteur 'name', ou une chaîne vide si elle n'existe pas.
+QString ChatManager::getInterlocutorImagePath(const QString &name, int index) const
+{
+    for (const QString &ext : kImageExtensions)
+    {
+        QString path = m_chatFilesPath + "/" + name + QString::number(index) + ext;
+        if (QFile::exists(path))
+            return path;
+    }
+    return {};
+}
+
+// Copie, redimensionne (max 400×400, ratio préservé), et sauvegarde l'image.
+bool ChatManager::setInterlocutorImage(const QString &name, int index, const QUrl &sourceUrl)
+{
+    QString sourcePath = sourceUrl.toLocalFile();
+    QImage img(sourcePath);
+    if (img.isNull())
+    {
+        qWarning() << "setInterlocutorImage: cannot load image from" << sourcePath;
+        return false;
+    }
+
+    // Redimensionner si nécessaire
+    if (img.width() > 400 || img.height() > 400)
+        img = img.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    // Supprimer les éventuelles anciennes images (toutes extensions)
+    for (const QString &ext : kImageExtensions)
+    {
+        QString old = m_chatFilesPath + "/" + name + QString::number(index) + ext;
+        if (QFile::exists(old))
+            QFile::remove(old);
+    }
+
+    // Déterminer l'extension de sortie (conserver jpg/png selon la source)
+    QString srcLower = sourcePath.toLower();
+    QString saveExt = srcLower.endsWith(".png") ? ".png" : ".jpg";
+    QString savePath = m_chatFilesPath + "/" + name + QString::number(index) + saveExt;
+
+    if (!img.save(savePath))
+    {
+        qWarning() << "setInterlocutorImage: cannot save image to" << savePath;
+        return false;
+    }
+
+    // Mettre à jour les propriétés si c'est l'interlocuteur actif
+    if (name == m_activeInterlocutorName)
+        refreshActiveImagePaths(name);
+
+    return true;
+}
+
+// Supprime l'image d'index 'index' pour l'interlocuteur 'name'.
+void ChatManager::clearInterlocutorImage(const QString &name, int index)
+{
+    for (const QString &ext : kImageExtensions)
+    {
+        QString path = m_chatFilesPath + "/" + name + QString::number(index) + ext;
+        if (QFile::exists(path))
+            QFile::remove(path);
+    }
+
+    if (name == m_activeInterlocutorName)
+        refreshActiveImagePaths(name);
+}
+
+// Met à jour m_activeImagePath1/2 et émet le signal.
+void ChatManager::refreshActiveImagePaths(const QString &name)
+{
+    m_activeImagePath1 = getInterlocutorImagePath(name, 1);
+    m_activeImagePath2 = getInterlocutorImagePath(name, 2);
+    emit activeInterlocutorImagePathsChanged();
 }
 
 Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *config)

@@ -8,8 +8,11 @@ import Tether 1.0
 ApplicationWindow {
     id: _root
     visible: true
-    width: 960
+    // La fenêtre s'élargit à 1360 dès qu'au moins une image de personnage est active
+    property bool hasImages: (_chatManager.activeInterlocutorImagePath1 !== "") || (_chatManager.activeInterlocutorImagePath2 !== "")
+    width: hasImages ? 1360 : 960
     height: 800
+    Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
 
     // Custom colors
     property color humanMessageColor: "#fff8e1"  // pale yellow
@@ -130,12 +133,16 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignHCenter
 
-            // 1.2.1 `_chatArea` : Chat Window content, composed of:
-            // - a ListView of the former messages from the current dialog
-            // - the input area where the human can type their message.
+            // 1.2.1 `_chatArea` : Chat Window content + optional image side-panel
+            RowLayout {
+                id: _chatAreaRow
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
+
+            // Chat column
             ColumnLayout {
                 id: _chatArea
-                width: parent.width
                 Layout.fillHeight: true
                 Layout.fillWidth: true
 
@@ -463,7 +470,74 @@ ApplicationWindow {
                         }
                     }
                 }
-            }
+            } // end _chatArea ColumnLayout
+
+            // ── Image side-panel ──────────────────────────────────────────
+            Rectangle {
+                id: _imageSidePanel
+                visible: _root.hasImages
+                Layout.preferredWidth: 400
+                Layout.fillHeight: true
+                color: "#F0F0F0"
+                border.color: "#E0E0E0"
+                border.width: 1
+
+                Column {
+                    anchors {
+                        top: parent.top
+                        horizontalCenter: parent.horizontalCenter
+                        topMargin: 12
+                    }
+                    spacing: 12
+
+                    // Image 1
+                    Image {
+                        id: _charImage1
+                        source: _chatManager.activeInterlocutorImagePath1 !== ""
+                                ? ("file:///" + _chatManager.activeInterlocutorImagePath1.replace(/\\/g, "/"))
+                                : ""
+                        visible: _chatManager.activeInterlocutorImagePath1 !== ""
+                        width: 376
+                        height: 376
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        cache: false
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            border.color: "#BDBDBD"
+                            border.width: 1
+                            radius: 4
+                        }
+                    }
+
+                    // Image 2
+                    Image {
+                        id: _charImage2
+                        source: _chatManager.activeInterlocutorImagePath2 !== ""
+                                ? ("file:///" + _chatManager.activeInterlocutorImagePath2.replace(/\\/g, "/"))
+                                : ""
+                        visible: _chatManager.activeInterlocutorImagePath2 !== ""
+                        width: 376
+                        height: 376
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        cache: false
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            border.color: "#BDBDBD"
+                            border.width: 1
+                            radius: 4
+                        }
+                    }
+                } // Column
+            } // _imageSidePanel
+
+            } // end _chatAreaRow RowLayout
+
             // 1.2.2 `_configArea` : Configuration form: IP address of the API endpoint, API Key,
             // Size of the rolling context, directories used for data storage, ...
             // ------------------------------
@@ -568,6 +642,10 @@ ApplicationWindow {
                                 modelComboBox.model = [];
                                 modelComboBox.currentIndex = -1;
                             }
+
+                            // 3. Rafraîchir les miniatures image dans la config
+                            _configImg1Preview.imgPath = _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 1)
+                            _configImg2Preview.imgPath = _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 2)
                         }
                     }
 
@@ -677,6 +755,95 @@ ApplicationWindow {
                                     placeholderText: "You are a helpful assistant..."
                                     wrapMode: Text.Wrap
                                     onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.systemPrompt = text
+                                }
+                            }
+
+                            // ── Images de personnage ──────────────────────────────────────
+                            Label {
+                                text: qsTr("Character Image 1:")
+                                Layout.alignment: Qt.AlignTop
+                            }
+                            RowLayout {
+                                spacing: 8
+                                // Miniature de l'image 1
+                                Image {
+                                    id: _configImg1Preview
+                                    property string imgPath: _chatManager.currentConfig
+                                        ? _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 1)
+                                        : ""
+                                    source: imgPath !== "" ? ("file:///" + imgPath.replace(/\\/g, "/")) : ""
+                                    visible: imgPath !== ""
+                                    width: 60; height: 60
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    cache: false
+                                }
+                                // Bouton upload / effacement image 1
+                                Button {
+                                    text: _configImg1Preview.imgPath !== "" ? qsTr("✕ Clear") : qsTr("Upload…")
+                                    onClicked: {
+                                        if (_configImg1Preview.imgPath !== "") {
+                                            _chatManager.clearInterlocutorImage(_chatManager.currentConfig.name, 1)
+                                            _configImg1Preview.imgPath = ""
+                                        } else {
+                                            imgDialog1.open()
+                                        }
+                                    }
+                                }
+                                FileDialog {
+                                    id: imgDialog1
+                                    title: qsTr("Choisissez l'image 1 du personnage")
+                                    nameFilters: [ "Images (*.jpg *.jpeg *.png)" ]
+                                    onAccepted: {
+                                        if (_chatManager.setInterlocutorImage(_chatManager.currentConfig.name, 1, imgDialog1.currentFile)) {
+                                            _configImg1Preview.imgPath =
+                                                _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 1)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Label {
+                                text: qsTr("Character Image 2:")
+                                Layout.alignment: Qt.AlignTop
+                            }
+                            RowLayout {
+                                spacing: 8
+                                // Miniature de l'image 2
+                                Image {
+                                    id: _configImg2Preview
+                                    property string imgPath: _chatManager.currentConfig
+                                        ? _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 2)
+                                        : ""
+                                    source: imgPath !== "" ? ("file:///" + imgPath.replace(/\\/g, "/")) : ""
+                                    visible: imgPath !== ""
+                                    width: 60; height: 60
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    cache: false
+                                }
+                                // Bouton upload / effacement image 2
+                                Button {
+                                    text: _configImg2Preview.imgPath !== "" ? qsTr("✕ Clear") : qsTr("Upload…")
+                                    onClicked: {
+                                        if (_configImg2Preview.imgPath !== "") {
+                                            _chatManager.clearInterlocutorImage(_chatManager.currentConfig.name, 2)
+                                            _configImg2Preview.imgPath = ""
+                                        } else {
+                                            imgDialog2.open()
+                                        }
+                                    }
+                                }
+                                FileDialog {
+                                    id: imgDialog2
+                                    title: qsTr("Choisissez l'image 2 du personnage")
+                                    nameFilters: [ "Images (*.jpg *.jpeg *.png)" ]
+                                    onAccepted: {
+                                        if (_chatManager.setInterlocutorImage(_chatManager.currentConfig.name, 2, imgDialog2.currentFile)) {
+                                            _configImg2Preview.imgPath =
+                                                _chatManager.getInterlocutorImagePath(_chatManager.currentConfig.name, 2)
+                                        }
+                                    }
                                 }
                             }
 
