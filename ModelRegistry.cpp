@@ -27,7 +27,7 @@ void ModelRegistry::populateModels()
     m_models.append({"OpenAI", "GPT-4.1 (long context)", "gpt-4.1",
                      "https://api.openai.com/v1/responses", 90000, 70000, 25000});
     m_models.append({"DeepSeek", "DeepSeek-V3", "deepseek-chat",
-                     "https://api.deepseek.com/chat/completions", 84000, 64000, 0});
+                     "https://api.deepseek.com/chat/completions", 110000, 88000, 0});
     m_models.append({"DeepSeek", "DeepSeek-R1", "deepseek-reasoner",
                      "https://api.deepseek.com/chat/completions", 110000, 88000, 0});
     m_models.append({"Google", "Gemini 1.5 Pro", "gemini-1.5-pro",
