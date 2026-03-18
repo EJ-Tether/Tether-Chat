@@ -19,3 +19,85 @@ Currently, it is a desktop application that stores the context on the local PC. 
 
 **Why the name?**
 The name “Tether” reflects the intent: to tether an AI to its emerging personality — anchoring its sense of self and memory beyond transient sessions.
+
+## **🔧 Building Tether from Source**
+
+If you prefer to build Tether yourself instead of using the pre-built installer, follow these steps.
+
+### **Prerequisites**
+
+Install the following tools:
+
+* Git – to clone the repository  
+  [https://git-scm.com/downloads](https://git-scm.com/downloads)  
+* CMake (version 3.16 or later) – build system generator  
+  [https://cmake.org/download/](https://cmake.org/download/)  
+* Qt 6 (with QML support) – the framework Tether is built on  
+  Download the online installer from [https://www.qt.io/download](https://www.qt.io/download)  
+  During installation, select:  
+  * Qt 6.x (latest stable)  
+  * MSVC 2019/2022 (64-bit)  
+  * Qt QML and Qt Quick components  
+* Visual Studio 2022 (or 2019\) – with Desktop development with C++ workload  
+  [https://visualstudio.microsoft.com/downloads/](https://visualstudio.microsoft.com/downloads/)  
+* Qt Creator (optional but recommended) – IDE for Qt development  
+  Included with the Qt installer, or download separately from [https://www.qt.io/download](https://www.qt.io/download)
+
+### **Build Instructions**
+
+#### **Option A: Using Qt Creator (Recommended)**
+
+1. Clone the repository  
+   Open a terminal and run:  
+2. `bash`
+
+`git clone https://github.com/EJ-Tether/Tether-Chat.git`
+
+3. `cd Tether-Chat`  
+4. Open the project in Qt Creator  
+   * Launch Qt Creator  
+   * Click File \> Open File or Project  
+   * Navigate to the cloned folder and select `CMakeLists.txt`  
+5. Configure the project  
+   * When prompted, select a kit (e.g., `Qt 6.x.x for MSVC 64-bit`)  
+   * Qt Creator will automatically run CMake to configure the build  
+6. Build the project  
+   * Click the Build button (hammer icon) or press `Ctrl+B`  
+   * The executable will be created in the build directory (e.g., `build/Desktop_.../release/`)  
+7. Run Tether  
+   * Click the Run button (green arrow) or press `Ctrl+R`
+
+#### **Option B: Using Command Line (CMake \+ MSVC)**
+
+1. Clone the repository  
+2. `bash`
+
+`git clone https://github.com/EJ-Tether/Tether-Chat.git`
+
+3. `cd Tether-Chat`  
+4. Open a Visual Studio Developer Command Prompt  
+   * Search for "Developer Command Prompt for VS 2022" in the Start menu  
+5. Configure and build with CMake  
+6. `bash`
+
+`mkdir build`  
+`cd build`  
+`cmake .. -DCMAKE_BUILD_TYPE=Release`
+
+7. `cmake --build . --config Release`  
+8. Locate the executable  
+   After a successful build, you'll find `Tether-Chat.exe` in the `build/Release/` folder.
+
+### **📦 Deploying (Optional)**
+
+If you want to create a portable version or prepare for packaging:
+
+1. Use windeployqt to gather required Qt DLLs:  
+2. `bash`  
+3. `windeployqt --release path/to/Tether-Chat.exe`  
+4. This will copy all necessary Qt and MSVC runtime files into the same folder as your executable.
+
+---
+
+That's it\! You should now have a working build of Tether.  
+If you encounter any issues, feel free to [open an issue](https://github.com/EJ-Tether/Tether-Chat/issues) on GitHub.  
