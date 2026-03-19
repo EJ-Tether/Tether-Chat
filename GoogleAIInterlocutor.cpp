@@ -1,21 +1,21 @@
 // Begin GoogleAIInterlocutor.cpp
 #include "GoogleAIInterlocutor.h"
+#include "TetherLogger.h"
 #include <QDebug>
+#include <QFileInfo>
+#include <QHttpMultiPart>
+#include <QHttpPart>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMimeDatabase>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrlQuery>
-#include <QHttpMultiPart>
-#include <QHttpPart>
-#include <QMimeDatabase>
-#include <QFileInfo>
 
-GoogleAIInterlocutor::GoogleAIInterlocutor(QString interlocutorName,
-                                           const QString &apiKey,
-                                           const QUrl &url,
-                                           QObject *parent)
+
+GoogleAIInterlocutor::GoogleAIInterlocutor(QString interlocutorName, const QString &apiKey,
+                                           const QUrl &url, QObject *parent)
     : Interlocutor(interlocutorName, parent)
     , m_apiKey(apiKey)
     , m_url(url)
@@ -23,11 +23,9 @@ GoogleAIInterlocutor::GoogleAIInterlocutor(QString interlocutorName,
     m_manager = new QNetworkAccessManager(this);
 }
 
-void GoogleAIInterlocutor::sendRequest(
-    const QList<ChatMessage> &history,
-    const QString& ancientMemory,
-    InterlocutorReply::Kind kind,
-    const QStringList &attachmentFileIds)
+void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
+                                       const QString &ancientMemory, InterlocutorReply::Kind kind,
+                                       const QStringList &attachmentFileIds)
 {
     // L'URL de l'API v1beta de Gemini nécessite la clé en paramètre
     QUrl requestUrl(m_url);
@@ -40,30 +38,35 @@ void GoogleAIInterlocutor::sendRequest(
 
     // --- Construction du payload JSON pour Google Gemini ---
     QJsonObject payload;
-    
+
     // 1. System Instruction (Native support in Gemini 1.5)
     // On combine m_systemPrompt et ancientMemory
     QString fullSystemPrompt = m_systemPrompt;
-    if (!ancientMemory.isEmpty()) {
-        if (!fullSystemPrompt.isEmpty()) fullSystemPrompt += "\n\n";
+    if (!ancientMemory.isEmpty())
+    {
+        if (!fullSystemPrompt.isEmpty())
+            fullSystemPrompt += "\n\n";
         fullSystemPrompt += "--- LONG-TERM MEMORY SUMMARY ---\n" + ancientMemory;
     }
 
-    if (!fullSystemPrompt.isEmpty()) {
+    if (!fullSystemPrompt.isEmpty())
+    {
         QJsonObject systemInstruction;
         QJsonObject parts;
         parts["text"] = fullSystemPrompt;
         systemInstruction["parts"] = QJsonObject{{"text", fullSystemPrompt}};
-        // Note: "parts" doit être un tableau ou un objet selon la version, mais v1beta attend souvent un tableau "parts": [{text: ...}]
-        // Correction: system_instruction: { parts: [ { text: "..." } ] }
-        systemInstruction["parts"] = QJsonArray{ QJsonObject{{"text", fullSystemPrompt}} };
-        
+        // Note: "parts" doit être un tableau ou un objet selon la version, mais v1beta attend
+        // souvent un tableau "parts": [{text: ...}] Correction: system_instruction: { parts: [ {
+        // text: "..." } ] }
+        systemInstruction["parts"] = QJsonArray{QJsonObject{{"text", fullSystemPrompt}}};
+
         payload["system_instruction"] = systemInstruction;
     }
 
     QJsonArray contentsArray;
 
-    for (int i = 0; i < history.size(); ++i) {
+    for (int i = 0; i < history.size(); ++i)
+    {
         const ChatMessage &msg = history[i];
         QJsonObject turn;
 
@@ -71,30 +74,35 @@ void GoogleAIInterlocutor::sendRequest(
         turn["role"] = msg.isLocalMessage() ? "user" : "model";
 
         QJsonArray partsArray;
-        
+
         // Texte du message
-        if (!msg.text().isEmpty()) {
+        if (!msg.text().isEmpty())
+        {
             partsArray.append(QJsonObject{{"text", msg.text()}});
         }
-        
+
         // Si c'est le dernier message (le nôtre) et qu'il y a des fichiers
-        if (i == history.size() - 1 && msg.isLocalMessage() && !attachmentFileIds.isEmpty()) {
-             // Déduplication simple
+        if (i == history.size() - 1 && msg.isLocalMessage() && !attachmentFileIds.isEmpty())
+        {
+            // Déduplication simple
             QSet<QString> seen;
-            for (const QString &fid : attachmentFileIds) {
-                if (fid.isEmpty() || seen.contains(fid)) continue;
+            for (const QString &fid : attachmentFileIds)
+            {
+                if (fid.isEmpty() || seen.contains(fid))
+                    continue;
                 seen.insert(fid);
-                
+
                 // fid est "uri|mimeType"
                 QStringList parts = fid.split('|');
-                if (parts.size() == 2) {
+                if (parts.size() == 2)
+                {
                     QString uri = parts[0];
                     QString mimeType = parts[1];
-                    
+
                     QJsonObject fileData;
                     fileData["mime_type"] = mimeType;
                     fileData["file_uri"] = uri;
-                    
+
                     partsArray.append(QJsonObject{{"file_data", fileData}});
                 }
             }
@@ -107,53 +115,76 @@ void GoogleAIInterlocutor::sendRequest(
     payload["contents"] = contentsArray;
 
     QByteArray data = QJsonDocument(payload).toJson();
+
+    // --- Logging ---
+    const QString kindLabel = (kind == InterlocutorReply::Kind::CurationResult)
+                                  ? QStringLiteral("CurationResult")
+                                  : QStringLiteral("NormalReply");
+    TetherLogger::log(m_interlocutorName, QStringLiteral("REQUEST"), kindLabel, data);
+
     QNetworkReply *reply = m_manager->post(request, data);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, kind]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument jsonResponse = QJsonDocument::fromJson(reply->readAll());
-            if (jsonResponse.isNull() || !jsonResponse.isObject()) {
-                emit errorOccurred("Invalid JSON response from Google API.");
-                reply->deleteLater();
-                return;
-            }
+    connect(
+        reply, &QNetworkReply::finished, this,
+        [this, reply, kind, kindLabel]()
+        {
+            const QByteArray raw = reply->readAll();
+            // Log every response (success and error)
+            TetherLogger::log(m_interlocutorName, QStringLiteral("RESPONSE"), kindLabel, raw);
 
-            QJsonObject geminiResponse = jsonResponse.object();
+            if (reply->error() == QNetworkReply::NoError)
+            {
+                QJsonDocument jsonResponse = QJsonDocument::fromJson(raw);
+                if (jsonResponse.isNull() || !jsonResponse.isObject())
+                {
+                    emit errorOccurred("Invalid JSON response from Google API.");
+                    reply->deleteLater();
+                    return;
+                }
 
-            // --- PARSING de la réponse Gemini et création de InterlocutorReply ---
-            InterlocutorReply cleanReply;
-            cleanReply.kind = kind; // On propage le 'kind'
+                QJsonObject geminiResponse = jsonResponse.object();
 
-            // Extraire le texte de la réponse
-            if (geminiResponse.contains("candidates") && geminiResponse["candidates"].isArray()) {
-                QJsonArray candidates = geminiResponse["candidates"].toArray();
-                if (!candidates.isEmpty()) {
-                    // On navigue dans la structure spécifique à Gemini
-                    QJsonArray parts = candidates[0].toObject()["content"].toObject()["parts"].toArray();
-                    for(const QJsonValue &part : parts) {
-                        cleanReply.text += part.toObject()["text"].toString();
+                // --- PARSING de la réponse Gemini et création de InterlocutorReply ---
+                InterlocutorReply cleanReply;
+                cleanReply.kind = kind; // On propage le 'kind'
+
+                // Extraire le texte de la réponse
+                if (geminiResponse.contains("candidates") && geminiResponse["candidates"].isArray())
+                {
+                    QJsonArray candidates = geminiResponse["candidates"].toArray();
+                    if (!candidates.isEmpty())
+                    {
+                        // On navigue dans la structure spécifique à Gemini
+                        QJsonArray parts =
+                            candidates[0].toObject()["content"].toObject()["parts"].toArray();
+                        for (const QJsonValue &part : parts)
+                        {
+                            cleanReply.text += part.toObject()["text"].toString();
+                        }
                     }
                 }
+
+                // Extraire l'usage des tokens
+                if (geminiResponse.contains("usageMetadata"))
+                {
+                    QJsonObject usage = geminiResponse["usageMetadata"].toObject();
+                    cleanReply.inputTokens = usage["promptTokenCount"].toInt();
+                    cleanReply.outputTokens = usage["candidatesTokenCount"].toInt();
+                    cleanReply.totalTokens = usage["totalTokenCount"].toInt();
+                }
+
+                emit replyReady(cleanReply);
             }
-
-            // Extraire l'usage des tokens
-            if (geminiResponse.contains("usageMetadata")) {
-                QJsonObject usage = geminiResponse["usageMetadata"].toObject();
-                cleanReply.inputTokens = usage["promptTokenCount"].toInt();
-                cleanReply.outputTokens = usage["candidatesTokenCount"].toInt();
-                cleanReply.totalTokens = usage["totalTokenCount"].toInt();
+            else
+            {
+                emit errorOccurred("Google API Error: " + reply->errorString() + " | Body: " + raw);
             }
-
-            emit replyReady(cleanReply);
-
-        } else {
-            emit errorOccurred("Google API Error: " + reply->errorString() + " | Body: " + reply->readAll());
-        }
-        reply->deleteLater();
-    });
+            reply->deleteLater();
+        });
 }
 
-void GoogleAIInterlocutor::uploadFile(QString fileName, const QByteArray &content, const QString &purpose)
+void GoogleAIInterlocutor::uploadFile(QString fileName, const QByteArray &content,
+                                      const QString &purpose)
 {
     // Gemini API Upload URL
     QUrl url("https://generativelanguage.googleapis.com/upload/v1beta/files");
@@ -192,35 +223,43 @@ void GoogleAIInterlocutor::uploadFile(QString fileName, const QByteArray &conten
     QNetworkReply *reply = m_manager->post(request, multiPart);
     multiPart->setParent(reply); // Le reply prend la propriété du multipart
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, purpose, mimeType]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            QJsonObject obj = doc.object();
-            if (obj.contains("file")) {
-                QJsonObject fileData = obj["file"].toObject();
-                QString uri = fileData["uri"].toString();
-                
-                // Hack: on encode le mimeType dans l'ID pour le récupérer dans sendRequest
-                // Format: "uri|mimeType"
-                QString compositeId = uri + "|" + mimeType;
-                
-                qDebug() << "Google File Uploaded:" << compositeId;
-                emit fileUploaded(compositeId, purpose);
-            } else {
-                emit fileUploadFailed("Google Upload: No 'file' object in response.");
-            }
-        } else {
-            emit fileUploadFailed("Google Upload Error: " + reply->errorString());
-        }
-        reply->deleteLater();
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, purpose, mimeType]()
+            {
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                    QJsonObject obj = doc.object();
+                    if (obj.contains("file"))
+                    {
+                        QJsonObject fileData = obj["file"].toObject();
+                        QString uri = fileData["uri"].toString();
+
+                        // Hack: on encode le mimeType dans l'ID pour le récupérer dans sendRequest
+                        // Format: "uri|mimeType"
+                        QString compositeId = uri + "|" + mimeType;
+
+                        qDebug() << "Google File Uploaded:" << compositeId;
+                        emit fileUploaded(compositeId, purpose);
+                    }
+                    else
+                    {
+                        emit fileUploadFailed("Google Upload: No 'file' object in response.");
+                    }
+                }
+                else
+                {
+                    emit fileUploadFailed("Google Upload Error: " + reply->errorString());
+                }
+                reply->deleteLater();
+            });
 }
 
 void GoogleAIInterlocutor::deleteFile(const QString &fileId)
 {
     // fileId est sous la forme "uri|mimeType" ou juste "uri"
     QString uri = fileId.split('|').first();
-    
+
     QUrl url(uri);
     QUrlQuery query;
     query.addQueryItem("key", m_apiKey);
@@ -229,12 +268,15 @@ void GoogleAIInterlocutor::deleteFile(const QString &fileId)
     QNetworkRequest request(url);
     QNetworkReply *reply = m_manager->deleteResource(request);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, fileId]() {
-        bool success = (reply->error() == QNetworkReply::NoError);
-        if (!success) {
-            qWarning() << "Google Delete Error:" << reply->errorString();
-        }
-        emit fileDeleted(fileId, success);
-        reply->deleteLater();
-    });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, fileId]()
+            {
+                bool success = (reply->error() == QNetworkReply::NoError);
+                if (!success)
+                {
+                    qWarning() << "Google Delete Error:" << reply->errorString();
+                }
+                emit fileDeleted(fileId, success);
+                reply->deleteLater();
+            });
 }

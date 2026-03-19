@@ -34,6 +34,7 @@ qt_add_qml_module(appTether
         SOURCES ModelInfo.h
         SOURCES ManagedFile.cpp ManagedFile.h
         SOURCES InterlocutorReply.h
+        SOURCES TetherLogger.h TetherLogger.cpp
 
 )
 
