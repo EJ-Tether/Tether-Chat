@@ -884,13 +884,53 @@ ApplicationWindow {
             }
             // 1.2.3 `_infoArea` : Information page, versions, details, URL of the github, ...
             // ------------------------------
-            ColumnLayout {
+            ScrollView {
                 id: _infoArea
-                visible: true
-                width: parent.width
+                visible: _tabBar.currentIndex === 2
+                Layout.fillWidth: true
                 Layout.fillHeight: true
-                Label {
-                    text: "Information Window : PLACEHOLDER, TO BE IMPLEMENTED"
+                clip: true
+
+                ColumnLayout {
+                    width: Math.min(_infoArea.availableWidth - 40, 800)
+                    x: Math.max(0, (_infoArea.availableWidth - width) / 2)
+                    spacing: 15
+
+                    Item { Layout.preferredHeight: 20 }
+
+                    Label {
+                        text: "Tether Chat"
+                        font.pixelSize: 32
+                        font.bold: true
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+
+                    Label {
+                        text: "Version 1.0"
+                        font.pixelSize: 18
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+
+                    Label {
+                        text: "License: GNU General Public License v2.0 (GPLv2)"
+                        font.pixelSize: 14
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+
+                    TextArea {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 500
+                        Layout.margins: 20
+                        readOnly: true
+                        wrapMode: Text.WordWrap
+                        text: "GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\n\nCopyright (C) 1989, 1991 Free Software Foundation, Inc.\n51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA\n\nEveryone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.\n\n[...]\n\nThis program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.\n\nThis program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details."
+                        background: Rectangle {
+                            color: "#F5F5F5"
+                            border.color: "#E0E0E0"
+                            radius: 4
+                        }
+                    }
+                    Item { Layout.preferredHeight: 20 }
                 }
             }
         }
