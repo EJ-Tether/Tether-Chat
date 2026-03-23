@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
     app.setApplicationName("Tether");
 
     qputenv("QT_QUICK_CONTROLS_STYLE", "Material");
+    qputenv("QML_XHR_ALLOW_FILE_READ", "1"); // Enable loading the Qt Resource LICENSE via XMLHttpRequest
     QGuiApplication::setApplicationName("TetherChat");
     QQmlApplicationEngine engine;
 

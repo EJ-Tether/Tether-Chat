@@ -963,27 +963,32 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                     }
 
-                    TextArea {
-                        id: licenseTextArea
+                    ScrollView {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 500
-                        Layout.margins: 20
-                        readOnly: true
-                        wrapMode: Text.WordWrap
-                        text: "Loading license..."
-                        background: Rectangle {
-                            color: "#F5F5F5"
-                            border.color: "#E0E0E0"
-                            radius: 4
-                        }
-                        Component.onCompleted: {
-                            var xhr = new XMLHttpRequest();
-                            xhr.open("GET", "qrc:/qt/qml/Tether/LICENSE", false);
-                            xhr.send();
-                            if (xhr.status === 200 || xhr.status === 0) {
-                                text = xhr.responseText;
-                            } else {
-                                text = "Failed to load license string (Status: " + xhr.status + ")";
+                        clip: true
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                        TextArea {
+                            id: licenseTextArea
+                            Layout.margins: 20
+                            readOnly: true
+                            wrapMode: Text.WordWrap
+                            text: "Loading license..."
+                            background: Rectangle {
+                                color: "#F5F5F5"
+                                border.color: "#E0E0E0"
+                                radius: 4
+                            }
+                            Component.onCompleted: {
+                                var xhr = new XMLHttpRequest();
+                                xhr.open("GET", "qrc:/qt/qml/Tether/LICENSE", false);
+                                xhr.send();
+                                if (xhr.status === 200 || xhr.status === 0) {
+                                    text = xhr.responseText;
+                                } else {
+                                    text = "Failed to load license string (Status: " + xhr.status + ")";
+                                }
                             }
                         }
                     }
