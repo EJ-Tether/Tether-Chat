@@ -91,6 +91,8 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
     // 4. Chat History
     for (const ChatMessage &msg : history)
     {
+        if (msg.isError() || msg.isTypingIndicator) continue;
+
         QJsonObject chatMsg;
         chatMsg["role"] = msg.isLocalMessage() ? "user" : "assistant";
         chatMsg["content"] = msg.text();

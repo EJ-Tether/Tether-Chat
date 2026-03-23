@@ -135,6 +135,8 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
     // 2) Historique (user -> input_text, assistant -> output_text)
     for (const ChatMessage &msg : history)
     {
+        if (msg.isError() || msg.isTypingIndicator) continue;
+
         QJsonObject historyMessage;
         historyMessage["role"] = msg.isLocalMessage() ? "user" : "assistant";
 

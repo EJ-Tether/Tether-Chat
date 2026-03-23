@@ -68,6 +68,8 @@ void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
     for (int i = 0; i < history.size(); ++i)
     {
         const ChatMessage &msg = history[i];
+        if (msg.isError() || msg.isTypingIndicator) continue;
+
         QJsonObject turn;
 
         // Le rôle de l'IA est "model" chez Google

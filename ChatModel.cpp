@@ -397,11 +397,22 @@ void ChatModel::onInterlocutorError(const QString &message)
     m_isWaitingForCurationResponse = false;
     removeTypingIndicator();
 
+    if (!m_messages.isEmpty()) {
+        ChatMessage &lastMsg = m_messages.last();
+        if (lastMsg.isLocalMessage()) {
+            lastMsg.setIsError(true);
+            QModelIndex idx = index(m_messages.count() - 1);
+            emit dataChanged(idx, idx, {IsErrorRole});
+        }
+    }
+
     // Ajouter le message d'erreur dans le chat
     ChatMessage errorMessage(false, message, QDateTime::currentDateTime(), 0, 0,
                              "system", // ou "assistant"
                              true);    // isError = true
     addMessage(errorMessage);
+
+    rewriteChatFile();
 }
 
 void ChatModel::handleNormalReply(const InterlocutorReply &reply)
