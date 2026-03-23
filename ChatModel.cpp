@@ -2,8 +2,8 @@
 #include "ChatModel.h"
 #include "ChatManager.h"
 #include "InterlocutorConfig.h"
+#include "TetherLogger.h"
 #include <QSettings>
-#include <QDebug>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -166,6 +166,7 @@ void ChatModel::addMessage(const ChatMessage &message)
             QTextStream stream(&file);
             stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
             file.close();
+            TetherLogger::logMessage(m_interlocutor ? m_interlocutor->name() : "Unknown", message);
         }
         else
         {
@@ -520,6 +521,9 @@ void ChatModel::handleCurationReply(const InterlocutorReply &reply)
     }
 
     saveOlderMemory(newSummary);
+    if (m_interlocutor) {
+        TetherLogger::logCuration(m_interlocutor->name(), newSummary);
+    }
     // Plus de upload/delete de fichiers ici pour la mémoire AI.
     emit curationFinished(true);
 }

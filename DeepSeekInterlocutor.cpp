@@ -1,5 +1,4 @@
 #include "DeepSeekInterlocutor.h"
-#include "TetherLogger.h"
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -103,23 +102,14 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
 
     QByteArray data = QJsonDocument(payload).toJson(QJsonDocument::Compact);
 
-    // --- Logging ---
-    const QString kindLabel = (kind == InterlocutorReply::Kind::CurationResult)
-                                  ? QStringLiteral("CurationResult")
-                                  : QStringLiteral("NormalReply");
-    TetherLogger::log(m_interlocutorName, QStringLiteral("REQUEST"), kindLabel, data);
-
     QNetworkReply *reply = m_manager->post(request, data);
 
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, kind, kindLabel]()
+            [this, reply, kind]()
             {
                 const QByteArray raw = reply->readAll();
                 const int statusCode =
                     reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-                // Log every response (success and error)
-                TetherLogger::log(m_interlocutorName, QStringLiteral("RESPONSE"), kindLabel, raw);
 
                 if (reply->error() != QNetworkReply::NoError || statusCode < 200 ||
                     statusCode >= 300)

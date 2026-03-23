@@ -1,6 +1,5 @@
 // Begin GoogleAIInterlocutor.cpp
 #include "GoogleAIInterlocutor.h"
-#include "TetherLogger.h"
 #include <QDebug>
 #include <QFileInfo>
 #include <QHttpMultiPart>
@@ -118,21 +117,13 @@ void GoogleAIInterlocutor::sendRequest(const QList<ChatMessage> &history,
 
     QByteArray data = QJsonDocument(payload).toJson();
 
-    // --- Logging ---
-    const QString kindLabel = (kind == InterlocutorReply::Kind::CurationResult)
-                                  ? QStringLiteral("CurationResult")
-                                  : QStringLiteral("NormalReply");
-    TetherLogger::log(m_interlocutorName, QStringLiteral("REQUEST"), kindLabel, data);
-
     QNetworkReply *reply = m_manager->post(request, data);
 
     connect(
         reply, &QNetworkReply::finished, this,
-        [this, reply, kind, kindLabel]()
+        [this, reply, kind]()
         {
             const QByteArray raw = reply->readAll();
-            // Log every response (success and error)
-            TetherLogger::log(m_interlocutorName, QStringLiteral("RESPONSE"), kindLabel, raw);
 
             if (reply->error() == QNetworkReply::NoError)
             {

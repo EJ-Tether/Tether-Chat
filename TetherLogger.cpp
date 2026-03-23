@@ -35,33 +35,48 @@ static QString logFilePath()
     return dir + "/Tether.log";
 }
 
-void TetherLogger::log(const QString &interlocutorName, const QString &direction,
-                       const QString &kind, const QByteArray &payload)
+#include <QJsonDocument>
+#include <QJsonObject>
+
+void TetherLogger::logMessage(const QString &interlocutorName, const ChatMessage &message)
 {
     QMutexLocker locker(&s_mutex);
 
     QFile file(logFilePath());
     if (!file.open(QIODevice::Append | QIODevice::Text))
     {
-        // Silently ignore: we must not crash the app because of a log failure.
         return;
     }
 
+    QJsonObject obj = message.toJsonObject();
+    obj["interlocutor"] = interlocutorName;
+    obj["type"] = "dialogue";
+
     QTextStream out(&file);
     out.setEncoding(QStringConverter::Utf8);
+    out << QJsonDocument(obj).toJson(QJsonDocument::Compact) << "\n";
+    file.close();
+}
 
-    // Header line
-    const QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-    out << "[" << timestamp << "] "
-        << "[" << interlocutorName << "] " << direction << " "
-        << "[" << kind << "]\n";
+void TetherLogger::logCuration(const QString &interlocutorName, const QString &ancientMemory)
+{
+    QMutexLocker locker(&s_mutex);
 
-    // Payload — pretty-print if it looks like JSON, otherwise dump raw
-    out << QString::fromUtf8(payload) << "\n";
+    QFile file(logFilePath());
+    if (!file.open(QIODevice::Append | QIODevice::Text))
+    {
+        return;
+    }
 
-    // Separator
-    out << SEPARATOR << "\n\n";
+    QJsonObject obj;
+    obj["interlocutor"] = interlocutorName;
+    obj["type"] = "curation";
+    obj["content"] = ancientMemory;
+    obj["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
 
+    QTextStream out(&file);
+    out.setEncoding(QStringConverter::Utf8);
+    out << QJsonDocument(obj).toJson(QJsonDocument::Compact) << "\n";
     file.close();
 }
 // End source file TetherLogger.cpp

@@ -17,15 +17,13 @@
 //
 // Thread-safe: a static QMutex protects the file writes.
 
+#include "ChatMessage.h"
+
 class TetherLogger
 {
 public:
-    // direction : "REQUEST" or "RESPONSE"
-    // kind      : human-readable label, e.g. "NormalReply", "CurationResult",
-    //             "AttachmentTokenCheck", "FileUpload"
-    // payload   : raw JSON bytes sent to / received from the API
-    static void log(const QString &interlocutorName, const QString &direction, const QString &kind,
-                    const QByteArray &payload);
+    static void logMessage(const QString &interlocutorName, const ChatMessage &message);
+    static void logCuration(const QString &interlocutorName, const QString &ancientMemory);
 };
 
 #endif // TETHERLOGGER_H
