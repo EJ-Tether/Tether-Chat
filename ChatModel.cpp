@@ -20,9 +20,13 @@ ChatModel::ChatModel(QObject *parent)
     , m_curationTriggerTokenCount(100001)
     , m_expectingContinuation(false)
     , m_extendedContextEnabled(false)
+    , m_globalLogEnabled(false)
+    , m_deepSeekNotesEnabled(true)
 {
     QSettings settings;
     m_extendedContextEnabled = settings.value("chat/extendedContextEnabled", false).toBool();
+    m_globalLogEnabled = settings.value("chat/globalLogEnabled", false).toBool();
+    m_deepSeekNotesEnabled = settings.value("chat/deepSeekNotesEnabled", true).toBool();
 }
 
 void ChatModel::setExtendedContextEnabled(bool enabled)
@@ -33,6 +37,26 @@ void ChatModel::setExtendedContextEnabled(bool enabled)
         settings.setValue("chat/extendedContextEnabled", enabled);
         emit extendedContextEnabledChanged();
         checkCurationThreshold();
+    }
+}
+
+void ChatModel::setGlobalLogEnabled(bool enabled)
+{
+    if (m_globalLogEnabled != enabled) {
+        m_globalLogEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/globalLogEnabled", enabled);
+        emit globalLogEnabledChanged();
+    }
+}
+
+void ChatModel::setDeepSeekNotesEnabled(bool enabled)
+{
+    if (m_deepSeekNotesEnabled != enabled) {
+        m_deepSeekNotesEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/deepSeekNotesEnabled", enabled);
+        emit deepSeekNotesEnabledChanged();
     }
 }
 

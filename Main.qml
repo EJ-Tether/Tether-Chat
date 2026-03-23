@@ -64,6 +64,11 @@ ApplicationWindow {
                 }
                 TabButton {
                     font.bold: checked
+                    text: qsTr("Parameters")
+                    width: implicitWidth
+                }
+                TabButton {
+                    font.bold: checked
                     text: qsTr("About")
                     width: implicitWidth
                 }
@@ -73,25 +78,6 @@ ApplicationWindow {
             }
             Label {
                 text: "Session cost: " + (_chatManager.chatModel ? (_chatManager.chatModel.cumulativeTokenCost + " tokens"): "")
-            }
-            CheckBox {
-                id: extendedContextCheckbox
-                text: "Extended context (no files)"
-                checked: _chatManager.chatModel ? _chatManager.chatModel.extendedContextEnabled : false
-                onCheckedChanged: {
-                    if (_chatManager.chatModel)
-                        _chatManager.chatModel.extendedContextEnabled = checked
-                }
-            }
-            Button {
-                id: _displayLicence
-                visible: _tabBar.currentIndex === 2
-                text: qsTr("Display Licence")
-                height: 40
-                width:80
-                onClicked: {
-                    // _debugLogs.open() // Si vous voulez toujours l'utiliser pour la licence
-                }
             }
             ComboBox {
                 id: languageSelector
@@ -873,20 +859,80 @@ ApplicationWindow {
                                     // POUR L'INSTANT CA NE FAIT RIEN...
                                     // MAIS DEMANDER DEUX OU TROIS CONFIRMATION CLAIRE AVANT D'EFFACER QUOIQUE CE SOIT !!!
                                 }
-                                Button {
-                                    text: "Reset Session Cost"
-                                    onClicked: _chatManager.chatModel.resetTokenCost()
-                                }
                             }
                         }
                     }
                 }
             }
-            // 1.2.3 `_infoArea` : Information page, versions, details, URL of the github, ...
+            // 1.2.3 `_parametersArea` : Application behavior parameters
+            // ------------------------------
+            ScrollView {
+                id: _parametersArea
+                visible: _tabBar.currentIndex === 2
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+
+                ColumnLayout {
+                    width: Math.min(_parametersArea.availableWidth - 40, 800)
+                    x: Math.max(0, (_parametersArea.availableWidth - width) / 2)
+                    spacing: 15
+
+                    Item { Layout.preferredHeight: 20 }
+
+                    Label {
+                        text: qsTr("Application Parameters")
+                        font.pixelSize: 24
+                        font.bold: true
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+
+                    CheckBox {
+                        id: globalLogCheckbox
+                        text: qsTr("Enable global logging to Tether.log")
+                        checked: _chatManager.chatModel ? _chatManager.chatModel.globalLogEnabled : false
+                        onCheckedChanged: {
+                            if (_chatManager.chatModel)
+                                _chatManager.chatModel.globalLogEnabled = checked
+                        }
+                    }
+
+                    CheckBox {
+                        id: deepSeekNotesCheckbox
+                        text: qsTr("Enable personal notebook (DeepSeek only)")
+                        checked: _chatManager.chatModel ? _chatManager.chatModel.deepSeekNotesEnabled : true
+                        onCheckedChanged: {
+                            if (_chatManager.chatModel)
+                                _chatManager.chatModel.deepSeekNotesEnabled = checked
+                        }
+                    }
+
+                    CheckBox {
+                        id: extendedContextCheckbox
+                        text: qsTr("Extend conversation context and disable attached files")
+                        checked: _chatManager.chatModel ? _chatManager.chatModel.extendedContextEnabled : false
+                        onCheckedChanged: {
+                            if (_chatManager.chatModel)
+                                _chatManager.chatModel.extendedContextEnabled = checked
+                        }
+                    }
+
+                    Item { Layout.preferredHeight: 20 }
+                    
+                    Button {
+                        text: qsTr("Reset Session Cost")
+                        Layout.alignment: Qt.AlignLeft
+                        onClicked: _chatManager.chatModel.resetTokenCost()
+                    }
+
+                    Item { Layout.fillHeight: true }
+                }
+            }
+            // 1.2.4 `_infoArea` : Information page, versions, details, URL of the github, ...
             // ------------------------------
             ScrollView {
                 id: _infoArea
-                visible: _tabBar.currentIndex === 2
+                visible: _tabBar.currentIndex === 3
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
@@ -912,22 +958,33 @@ ApplicationWindow {
                     }
 
                     Label {
-                        text: "License: GNU General Public License v2.0 (GPLv2)"
+                        text: "License: GNU General Public License v3.0 (GPLv3)"
                         font.pixelSize: 14
                         Layout.alignment: Qt.AlignHCenter
                     }
 
                     TextArea {
+                        id: licenseTextArea
                         Layout.fillWidth: true
                         Layout.preferredHeight: 500
                         Layout.margins: 20
                         readOnly: true
                         wrapMode: Text.WordWrap
-                        text: "GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\n\nCopyright (C) 1989, 1991 Free Software Foundation, Inc.\n51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA\n\nEveryone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.\n\n[...]\n\nThis program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.\n\nThis program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details."
+                        text: "Loading license..."
                         background: Rectangle {
                             color: "#F5F5F5"
                             border.color: "#E0E0E0"
                             radius: 4
+                        }
+                        Component.onCompleted: {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open("GET", "qrc:/qt/qml/Tether/LICENSE", false);
+                            xhr.send();
+                            if (xhr.status === 200 || xhr.status === 0) {
+                                text = xhr.responseText;
+                            } else {
+                                text = "Failed to load license string (Status: " + xhr.status + ")";
+                            }
                         }
                     }
                     Item { Layout.preferredHeight: 20 }

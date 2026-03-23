@@ -17,6 +17,8 @@ qt_add_executable(appTether
 qt_add_qml_module(appTether
     URI Tether
     VERSION 1.0
+    RESOURCES
+        LICENSE
     QML_FILES
         Main.qml
         SOURCES settings.h settings.cpp

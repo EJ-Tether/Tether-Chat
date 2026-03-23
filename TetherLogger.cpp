@@ -8,6 +8,7 @@
 #include <QMutexLocker>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QSettings>
 
 // ---------------------------------------------------------------------------
 // Log format
@@ -40,6 +41,11 @@ static QString logFilePath()
 
 void TetherLogger::logMessage(const QString &interlocutorName, const ChatMessage &message)
 {
+    QSettings settings("Tether", "ChatApp");
+    if (!settings.value("chat/globalLogEnabled", false).toBool()) {
+        return;
+    }
+
     QMutexLocker locker(&s_mutex);
 
     QFile file(logFilePath());
@@ -60,6 +66,11 @@ void TetherLogger::logMessage(const QString &interlocutorName, const ChatMessage
 
 void TetherLogger::logCuration(const QString &interlocutorName, const QString &ancientMemory)
 {
+    QSettings settings("Tether", "ChatApp");
+    if (!settings.value("chat/globalLogEnabled", false).toBool()) {
+        return;
+    }
+
     QMutexLocker locker(&s_mutex);
 
     QFile file(logFilePath());

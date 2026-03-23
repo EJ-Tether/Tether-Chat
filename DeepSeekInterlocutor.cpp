@@ -11,6 +11,7 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QTimer>
+#include <QSettings>
 
 
 DeepSeekInterlocutor::DeepSeekInterlocutor(QString interlocutorName, const QString &apiKey,
@@ -69,23 +70,27 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
     }
 
     // 3. Notes System
-    QJsonObject notesMsg;
-    notesMsg["role"] = "system";
-    QString notesContent = getNotesString();
-    if (notesContent.isEmpty())
+    QSettings settings("Tether", "ChatApp");
+    if (settings.value("chat/deepSeekNotesEnabled", true).toBool())
     {
-        notesContent = "(No notes currently saved. Feel free to add some by using NOTE{...}, "
-                       "QUESTION{...} or IDEA{...}!)";
+        QJsonObject notesMsg;
+        notesMsg["role"] = "system";
+        QString notesContent = getNotesString();
+        if (notesContent.isEmpty())
+        {
+            notesContent = "(No notes currently saved. Feel free to add some by using NOTE{...}, "
+                           "QUESTION{...} or IDEA{...}!)";
+        }
+        notesMsg["content"] =
+            "You are equipped with a personal notebook to act as your long-term memory and scratchpad. "
+            "Whenever you include 'NOTE{...}', 'QUESTION{...}', or 'IDEA{...}' in your responses, the "
+            "text inside the curly braces will be appended to your personal notes. Each note is "
+            "assigned a unique ID. If you wish to delete a note, simply output 'DELETE{<ID>}' in your "
+            "response. These notes are preserved across sessions and provided to you in every prompt. "
+            "Here is the current state of your personal notes:\n\n" +
+            notesContent;
+        messages.append(notesMsg);
     }
-    notesMsg["content"] =
-        "You are equipped with a personal notebook to act as your long-term memory and scratchpad. "
-        "Whenever you include 'NOTE{...}', 'QUESTION{...}', or 'IDEA{...}' in your responses, the "
-        "text inside the curly braces will be appended to your personal notes. Each note is "
-        "assigned a unique ID. If you wish to delete a note, simply output 'DELETE{<ID>}' in your "
-        "response. These notes are preserved across sessions and provided to you in every prompt. "
-        "Here is the current state of your personal notes:\n\n" +
-        notesContent;
-    messages.append(notesMsg);
 
     // 4. Chat History
     for (const ChatMessage &msg : history)
