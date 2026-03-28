@@ -39,6 +39,7 @@ void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history,
         // --- 3. Simulation du décompte de tokens ---
         int historyTokens = 0;
         for (const auto& msg : history) {
+            if (msg.isError() || msg.isTypingIndicator) continue;
             historyTokens += msg.text().length() / 4;
         }
 

@@ -29,6 +29,8 @@ public:
     virtual void setSystemPrompt(const QString &systemPrompt) {
         m_systemPrompt = systemPrompt;
     }
+    
+    QString name() const { return m_interlocutorName; }
 
 signals:
     void replyReady(const InterlocutorReply &reply);

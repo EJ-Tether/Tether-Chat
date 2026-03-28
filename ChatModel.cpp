@@ -2,8 +2,8 @@
 #include "ChatModel.h"
 #include "ChatManager.h"
 #include "InterlocutorConfig.h"
+#include "TetherLogger.h"
 #include <QSettings>
-#include <QDebug>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -20,9 +20,15 @@ ChatModel::ChatModel(QObject *parent)
     , m_curationTriggerTokenCount(100001)
     , m_expectingContinuation(false)
     , m_extendedContextEnabled(false)
+    , m_globalLogEnabled(false)
+    , m_deepSeekNotesEnabled(true)
+    , m_displayNotesEnabled(true)
 {
     QSettings settings;
     m_extendedContextEnabled = settings.value("chat/extendedContextEnabled", false).toBool();
+    m_globalLogEnabled = settings.value("chat/globalLogEnabled", false).toBool();
+    m_deepSeekNotesEnabled = settings.value("chat/deepSeekNotesEnabled", true).toBool();
+    m_displayNotesEnabled = settings.value("chat/displayNotesEnabled", true).toBool();
 }
 
 void ChatModel::setExtendedContextEnabled(bool enabled)
@@ -33,6 +39,36 @@ void ChatModel::setExtendedContextEnabled(bool enabled)
         settings.setValue("chat/extendedContextEnabled", enabled);
         emit extendedContextEnabledChanged();
         checkCurationThreshold();
+    }
+}
+
+void ChatModel::setGlobalLogEnabled(bool enabled)
+{
+    if (m_globalLogEnabled != enabled) {
+        m_globalLogEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/globalLogEnabled", enabled);
+        emit globalLogEnabledChanged();
+    }
+}
+
+void ChatModel::setDeepSeekNotesEnabled(bool enabled)
+{
+    if (m_deepSeekNotesEnabled != enabled) {
+        m_deepSeekNotesEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/deepSeekNotesEnabled", enabled);
+        emit deepSeekNotesEnabledChanged();
+    }
+}
+
+void ChatModel::setDisplayNotesEnabled(bool enabled)
+{
+    if (m_displayNotesEnabled != enabled) {
+        m_displayNotesEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/displayNotesEnabled", enabled);
+        emit displayNotesEnabledChanged();
     }
 }
 
@@ -166,6 +202,7 @@ void ChatModel::addMessage(const ChatMessage &message)
             QTextStream stream(&file);
             stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
             file.close();
+            TetherLogger::logMessage(m_interlocutor ? m_interlocutor->name() : "Unknown", message);
         }
         else
         {
@@ -397,11 +434,22 @@ void ChatModel::onInterlocutorError(const QString &message)
     m_isWaitingForCurationResponse = false;
     removeTypingIndicator();
 
+    if (!m_messages.isEmpty()) {
+        ChatMessage &lastMsg = m_messages.last();
+        if (lastMsg.isLocalMessage()) {
+            lastMsg.setIsError(true);
+            QModelIndex idx = index(m_messages.count() - 1);
+            emit dataChanged(idx, idx, {IsErrorRole});
+        }
+    }
+
     // Ajouter le message d'erreur dans le chat
     ChatMessage errorMessage(false, message, QDateTime::currentDateTime(), 0, 0,
                              "system", // ou "assistant"
                              true);    // isError = true
     addMessage(errorMessage);
+
+    rewriteChatFile();
 }
 
 void ChatModel::handleNormalReply(const InterlocutorReply &reply)
@@ -509,6 +557,9 @@ void ChatModel::handleCurationReply(const InterlocutorReply &reply)
     }
 
     saveOlderMemory(newSummary);
+    if (m_interlocutor) {
+        TetherLogger::logCuration(m_interlocutor->name(), newSummary);
+    }
     // Plus de upload/delete de fichiers ici pour la mémoire AI.
     emit curationFinished(true);
 }

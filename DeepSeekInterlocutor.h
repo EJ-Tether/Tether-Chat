@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
@@ -28,5 +29,12 @@ private:
     QString m_apiKey;
     QString m_model;
     QNetworkAccessManager *m_manager;
-    const int REQUEST_TIMEOUT_MS = 800000;
+    const int REQUEST_TIMEOUT_MS = 1200000;
+
+    QMap<int, QString> m_notes;
+    int m_nextNoteId;
+    void loadNotes();
+    void saveNotes();
+    QString processNotesFromReply(const QString& replyText);
+    QString getNotesString() const;
 };

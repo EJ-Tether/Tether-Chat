@@ -17,7 +17,40 @@ For now, the project only supports text. This may be extended to audio at a late
 
 Currently, it is a desktop application that stores the context on the local PC. This means that a chat is only accessible from the PC where it took place. We will consider cloud synchronization at a later date.
 
-**Why the name?**
+**The AI notebook feature**
+
+Tether includes a unique notebook feature that allows the AI to maintain its own persistent memory beyond the curated conversation history.
+
+How It Works
+During your conversation, the AI can use special commands to write, update, or delete notes that are preserved across sessions:
+
+Command	Purpose
+NOTE(...)	Appends a note to the AI's personal notebook
+QUESTION(...)	Saves a question for later reference
+IDEA(...)	Records an idea or thought
+DELETE(<ID>)	Removes a previously saved note (each note has a unique ID)
+
+Example
+The AI might respond with:
+
+That's an interesting point. NOTE(I should remember that the user prefers hard science fiction to other types of science fiction.)
+
+Persistent Across Sessions
+Unlike the conversation history that evolves through summarization, the notebook content is:
+
+### Preserved exactly as written
+
+Injected into every prompt so the AI always has access to it
+
+### Editable by the AI at any time using the commands above
+
+This gives the AI a true long-term memory that it can actively manage.
+
+### How to Use
+You don't need to do anything special — the AI will use this feature automatically when it deems something worth remembering.
+
+
+**Why the app's name?**
 The name “Tether” reflects the intent: to tether an AI to its emerging personality — anchoring its sense of self and memory beyond transient sessions.
 
 ## **🔧 Building Tether from Source**
@@ -101,3 +134,4 @@ If you want to create a portable version or prepare for packaging:
 
 That's it\! You should now have a working build of Tether.  
 If you encounter any issues, feel free to [open an issue](https://github.com/EJ-Tether/Tether-Chat/issues) on GitHub.  
+

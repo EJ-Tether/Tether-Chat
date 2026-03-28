@@ -134,6 +134,8 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
     // 2) Historique (user -> input_text, assistant -> output_text)
     for (const ChatMessage &msg : history)
     {
+        if (msg.isError() || msg.isTypingIndicator) continue;
+
         QJsonObject historyMessage;
         historyMessage["role"] = msg.isLocalMessage() ? "user" : "assistant";
 
@@ -183,6 +185,7 @@ void OpenAIInterlocutor::sendActualRequest(const QList<ChatMessage> &history,
     //                    << QJsonDocument(payload).toJson(QJsonDocument::Indented);
 
     QByteArray data = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+
     QNetworkReply *reply = m_manager->post(request, data);
 
     connect(
@@ -339,11 +342,13 @@ void OpenAIInterlocutor::checkAttachmentTokens(
 
     qDebug() << "Checking attachment token count...";
     QNetworkReply *reply = m_manager->post(request, data);
-    qDebug()<<"Posting token check request:"<<data;
+    qDebug() << "Posting token check request:" << data;
 
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, callback]()
             {
+                const QByteArray data = reply->readAll();
+
                 reply->deleteLater();
 
                 if (reply->error() != QNetworkReply::NoError)
@@ -355,7 +360,6 @@ void OpenAIInterlocutor::checkAttachmentTokens(
                     callback(false, 0, err);
                     return;
                 }
-                QByteArray data = reply->readAll();
                 // qDebug()<<"response received:"<<data;
                 QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
                 QJsonObject responseObj = jsonDoc.object();

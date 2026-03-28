@@ -159,6 +159,39 @@ public:
 
 signals:
     void extendedContextEnabledChanged();
+
+private:
+    // Global log enabled
+    bool m_globalLogEnabled = false;
+    Q_PROPERTY(bool globalLogEnabled READ globalLogEnabled WRITE setGlobalLogEnabled NOTIFY globalLogEnabledChanged)
+public:
+    bool globalLogEnabled() const { return m_globalLogEnabled; }
+    void setGlobalLogEnabled(bool enabled);
+
+signals:
+    void globalLogEnabledChanged();
+
+private:
+    // DeepSeek Notes enabled
+    bool m_deepSeekNotesEnabled = true;
+    Q_PROPERTY(bool deepSeekNotesEnabled READ deepSeekNotesEnabled WRITE setDeepSeekNotesEnabled NOTIFY deepSeekNotesEnabledChanged)
+public:
+    bool deepSeekNotesEnabled() const { return m_deepSeekNotesEnabled; }
+    void setDeepSeekNotesEnabled(bool enabled);
+
+signals:
+    void deepSeekNotesEnabledChanged();
+
+private:
+    // Display notes taken by the AI in the chat (DeepSeek only)
+    bool m_displayNotesEnabled = true;
+    Q_PROPERTY(bool displayNotesEnabled READ displayNotesEnabled WRITE setDisplayNotesEnabled NOTIFY displayNotesEnabledChanged)
+public:
+    bool displayNotesEnabled() const { return m_displayNotesEnabled; }
+    void setDisplayNotesEnabled(bool enabled);
+
+signals:
+    void displayNotesEnabledChanged();
 };
 
 #endif // CHATMODEL_H
