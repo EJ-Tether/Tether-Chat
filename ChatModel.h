@@ -181,6 +181,17 @@ public:
 
 signals:
     void deepSeekNotesEnabledChanged();
+
+private:
+    // Display notes taken by the AI in the chat (DeepSeek only)
+    bool m_displayNotesEnabled = true;
+    Q_PROPERTY(bool displayNotesEnabled READ displayNotesEnabled WRITE setDisplayNotesEnabled NOTIFY displayNotesEnabledChanged)
+public:
+    bool displayNotesEnabled() const { return m_displayNotesEnabled; }
+    void setDisplayNotesEnabled(bool enabled);
+
+signals:
+    void displayNotesEnabledChanged();
 };
 
 #endif // CHATMODEL_H

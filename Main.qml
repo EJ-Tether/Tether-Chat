@@ -909,12 +909,26 @@ ApplicationWindow {
                     }
 
                     CheckBox {
+                        id: displayNotesCheckbox
+                        text: qsTr("Display notes taken by the AI interlocutor")
+                        checked: _chatManager.chatModel ? _chatManager.chatModel.displayNotesEnabled : true
+                        onCheckedChanged: {
+                            if (_chatManager.chatModel)
+                                _chatManager.chatModel.displayNotesEnabled = checked
+                        }
+                    }
+
+                    CheckBox {
                         id: extendedContextCheckbox
-                        text: qsTr("Extend conversation context and disable attached files")
+                        text: qsTr("Extend the conversation context and disable the attached files.")
                         checked: _chatManager.chatModel ? _chatManager.chatModel.extendedContextEnabled : false
                         onCheckedChanged: {
                             if (_chatManager.chatModel)
                                 _chatManager.chatModel.extendedContextEnabled = checked
+                        }
+                        Text {
+                            anchors.bottom: parent.bottom;
+                            text: qsTr("(This allows you to use the tokens reserver for the attached files for the conversation context instead)");
                         }
                     }
 

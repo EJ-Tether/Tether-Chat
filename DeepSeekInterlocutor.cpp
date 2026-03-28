@@ -87,6 +87,8 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
             "text inside the curly braces will be appended to your personal notes. Each note is "
             "assigned a unique ID. If you wish to delete a note, simply output 'DELETE{<ID>}' in your "
             "response. These notes are preserved across sessions and provided to you in every prompt. "
+            "Notes are optional—you don't have to include one with every message —but you can use them "
+            "to keep track of things you want to remember over the long term. "
             "Here is the current state of your personal notes:\n\n" +
             notesContent;
         messages.append(notesMsg);
@@ -152,7 +154,8 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
                         cleanReply.text = message["content"].toString();
 
                         // Process any notes/ideas/questions/deletes generated in the reply
-                        processNotesFromReply(cleanReply.text);
+                        // Returns the text with note/delete tags stripped out
+                        cleanReply.text = processNotesFromReply(cleanReply.text);
                     }
                 }
 
@@ -260,7 +263,7 @@ QString DeepSeekInterlocutor::getNotesString() const
     return result;
 }
 
-void DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
+QString DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
 {
     bool notesChanged = false;
 
@@ -271,7 +274,7 @@ void DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
     while (addIt.hasNext())
     {
         QRegularExpressionMatch match = addIt.next();
-        QString content = match.captured(0).trimmed(); // Storing the full 'NOTE(xyz)' string
+        QString content = match.captured(0).trimmed(); // Storing the full 'NOTE{xyz}' string
         if (!content.isEmpty())
         {
             m_notes[m_nextNoteId++] = content;
@@ -297,4 +300,17 @@ void DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
     {
         saveNotes();
     }
+
+    // Strip note/delete tags from the displayed text only when the user has
+    // chosen not to display them (chat/displayNotesEnabled == false).
+    QSettings settings("Tether", "ChatApp");
+    if (!settings.value("chat/displayNotesEnabled", true).toBool())
+    {
+        QString cleanedText = replyText;
+        cleanedText.remove(addRe);
+        cleanedText.remove(delRe);
+        return cleanedText.trimmed();
+    }
+
+    return replyText;
 }

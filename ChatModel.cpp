@@ -22,11 +22,13 @@ ChatModel::ChatModel(QObject *parent)
     , m_extendedContextEnabled(false)
     , m_globalLogEnabled(false)
     , m_deepSeekNotesEnabled(true)
+    , m_displayNotesEnabled(true)
 {
     QSettings settings;
     m_extendedContextEnabled = settings.value("chat/extendedContextEnabled", false).toBool();
     m_globalLogEnabled = settings.value("chat/globalLogEnabled", false).toBool();
     m_deepSeekNotesEnabled = settings.value("chat/deepSeekNotesEnabled", true).toBool();
+    m_displayNotesEnabled = settings.value("chat/displayNotesEnabled", true).toBool();
 }
 
 void ChatModel::setExtendedContextEnabled(bool enabled)
@@ -57,6 +59,16 @@ void ChatModel::setDeepSeekNotesEnabled(bool enabled)
         QSettings settings;
         settings.setValue("chat/deepSeekNotesEnabled", enabled);
         emit deepSeekNotesEnabledChanged();
+    }
+}
+
+void ChatModel::setDisplayNotesEnabled(bool enabled)
+{
+    if (m_displayNotesEnabled != enabled) {
+        m_displayNotesEnabled = enabled;
+        QSettings settings;
+        settings.setValue("chat/displayNotesEnabled", enabled);
+        emit displayNotesEnabledChanged();
     }
 }
 

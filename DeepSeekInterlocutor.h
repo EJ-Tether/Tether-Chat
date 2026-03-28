@@ -35,6 +35,6 @@ private:
     int m_nextNoteId;
     void loadNotes();
     void saveNotes();
-    void processNotesFromReply(const QString& replyText);
+    QString processNotesFromReply(const QString& replyText);
     QString getNotesString() const;
 };
