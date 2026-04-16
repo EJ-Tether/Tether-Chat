@@ -711,7 +711,11 @@ ApplicationWindow {
                                 text: _chatManager.currentConfig ? _chatManager.currentConfig.apiKey : ""
                                 placeholderText: "sk-..."
                                 echoMode: TextInput.Password
-                                onTextChanged: if (_chatManager.currentConfig) _chatManager.currentConfig.apiKey = text
+                                onTextChanged: {
+                                    if (_chatManager.currentConfig) {
+                                        _chatManager.currentConfig.apiKey = text.trim();
+                                    }
+                                }
                             }
 
                             // Endpoint URL
