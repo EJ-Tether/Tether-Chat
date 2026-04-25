@@ -29,6 +29,8 @@ void ModelRegistry::populateModels()
                      "https://api.deepseek.com/chat/completions", 110000, 88000, 0});
     m_models.append({"DeepSeek", "DeepSeek-R1", "deepseek-reasoner",
                      "https://api.deepseek.com/chat/completions", 110000, 88000, 0});
+    m_models.append({"DeepSeek", "deepseek-v4-pro", "deepseek-v4-pro",
+                     "https://api.deepseek.com/chat/completions", 980000, 800000, 0});
     //m_models.append({"Google", "Gemini 1.5 Pro", "gemini-1.5-pro",
     //                 "https://generativelanguage.googleapis.com/v1beta/models/"
     //                 "%MODEL_NAME%:generateContent",
