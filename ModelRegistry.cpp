@@ -39,7 +39,6 @@ void ModelRegistry::populateModels()
     //                 "https://generativelanguage.googleapis.com/v1beta/models/"
     //                 "%MODEL_NAME%:generateContent",
     //                 28000, 20000, 25000});
-
 }
 
 QStringList ModelRegistry::availableProviders() const
