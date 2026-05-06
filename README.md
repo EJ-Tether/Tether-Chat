@@ -53,6 +53,33 @@ You don't need to do anything special — the AI will use this feature automatic
 **Why the app's name?**
 The name “Tether” reflects the intent: to tether an AI to its emerging personality — anchoring its sense of self and memory beyond transient sessions.
 
+## **⚙️ Configuring LLM Models**
+
+Tether externalizes the configuration of its LLM models into a `models.ini` file. This allows you to easily add new models, update existing ones, or remove obsolete ones without needing to recompile the application. 
+
+### Location of `models.ini`
+The configuration file is automatically generated the first time you run Tether and is located in your Documents folder under `TetherChats`:
+- **Windows**: `C:\Users\<YourUsername>\Documents\TetherChats\models.ini` (or `%USERPROFILE%\Documents\TetherChats\models.ini`)
+- **macOS/Linux**: `~/Documents/TetherChats/models.ini`
+
+### How to Add or Remove a Model
+To modify the available models:
+1. Open the `models.ini` file in any text editor.
+2. **To add a new model**, create a new section at the end of the file. The section name (in brackets) will be the Display Name of the model in the Tether interface. For example:
+   ```ini
+   [My New GPT Model]
+   provider=OpenAI
+   internalName=gpt-6.0
+   endpointTemplate=https://api.openai.com/v1/responses
+   curationTriggerTokenCount=260000
+   curationTargetTokenCount=180000
+   maxAttachedFileTokenCount=25000
+   ```
+3. **To remove a model**, simply delete its entire block (from the `[Model Name]` header down to its last property).
+4. Save the file and restart Tether. 
+
+The newly added model will now be available in the **Configure** tab when creating or editing an interlocutor.
+
 ## **🔧 Building Tether from Source**
 
 If you prefer to build Tether yourself instead of using the pre-built installer, follow these steps.
