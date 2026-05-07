@@ -2,6 +2,7 @@
 #include "ChatManager.h"
 #include "DeepSeekInterlocutor.h"
 #include "DummyInterlocutor.h"
+#include "AnthropicInterlocutor.h"
 #include "GoogleAIInterlocutor.h"
 #include "ModelInfo.h"
 #include "OpenAIInterlocutor.h"
@@ -391,6 +392,12 @@ Interlocutor *ChatManager::createInterlocutorFromConfig(InterlocutorConfig *conf
     {
         interlocutor = new GoogleAIInterlocutor(config->name(), config->apiKey(),
                                                 QUrl(config->endpointUrl()), this);
+    }
+    else if (model.provider == "Anthropic")
+    {
+        interlocutor = new AnthropicInterlocutor(config->name(), config->apiKey(),
+                                                  QUrl(config->endpointUrl()),
+                                                  model.internalName, this);
     }
     else if (config->type() == "Dummy")
     {

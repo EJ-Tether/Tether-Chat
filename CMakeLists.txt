@@ -31,6 +31,7 @@ qt_add_qml_module(appTether
         SOURCES InterlocutorConfig.cpp InterlocutorConfig.h
         SOURCES Interlocutor.h
         SOURCES GoogleAIInterlocutor.h GoogleAIInterlocutor.cpp
+        SOURCES AnthropicInterlocutor.h AnthropicInterlocutor.cpp
         SOURCES InterlocutorConfig.h
         SOURCES ModelRegistry.cpp ModelRegistry.h
         SOURCES ModelInfo.h

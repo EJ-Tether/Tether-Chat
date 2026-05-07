@@ -36,7 +36,11 @@ void ModelRegistry::populateModels()
             {"DeepSeek", "DeepSeek-R1", "deepseek-reasoner", "https://api.deepseek.com/chat/completions", 320000, 200000, 0},
             {"DeepSeek", "deepseek-v4-pro", "deepseek-v4-pro", "https://api.deepseek.com/chat/completions", 320000, 200000, 0},
             {"Google", "Gemini 1.5 Pro", "gemini-1.5-pro", "https://generativelanguage.googleapis.com/v1beta/models/%MODEL_NAME%:generateContent", 120000, 100000, 25000},
-            {"Google", "Gemini 1.0 Pro", "gemini-1.0-pro", "https://generativelanguage.googleapis.com/v1beta/models/%MODEL_NAME%:generateContent", 28000, 20000, 25000}
+            {"Google", "Gemini 1.0 Pro", "gemini-1.0-pro", "https://generativelanguage.googleapis.com/v1beta/models/%MODEL_NAME%:generateContent", 28000, 20000, 25000},
+            {"Anthropic", "Claude Sonnet 4.6", "claude-sonnet-4-6", "https://api.anthropic.com/v1/messages", 160000, 120000, 0},
+            {"Anthropic", "Claude Opus 4.6",   "claude-opus-4-6",   "https://api.anthropic.com/v1/messages", 160000, 120000, 0},
+            {"Anthropic", "Claude Opus 4.7",   "claude-opus-4-7",   "https://api.anthropic.com/v1/messages", 160000, 120000, 0},
+            {"Anthropic", "Claude Haiku 4.5",  "claude-haiku-4-5-20251001", "https://api.anthropic.com/v1/messages", 160000, 120000, 0}
         };
 
         for (const auto& model : defaultModels) {
