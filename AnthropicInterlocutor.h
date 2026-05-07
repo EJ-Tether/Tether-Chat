@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -38,5 +39,14 @@ private:
     QNetworkAccessManager *m_manager;
     const int REQUEST_TIMEOUT_MS = 360000;
     const int MAX_OUTPUT_TOKENS  = 8096;
+
+    // Notes / scrapbook (same system as DeepSeekInterlocutor)
+    QMap<int, QString> m_notes;
+    int m_nextNoteId;
+
+    void    loadNotes();
+    void    saveNotes();
+    QString getNotesString() const;
+    QString processNotesFromReply(const QString &replyText);
 };
 // End source file AnthropicInterlocutor.h

@@ -1,11 +1,17 @@
 // Begin source file AnthropicInterlocutor.cpp
 #include "AnthropicInterlocutor.h"
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QRegularExpression>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QTextStream>
 #include <QTimer>
 #include <QUrl>
 
@@ -16,9 +22,11 @@ AnthropicInterlocutor::AnthropicInterlocutor(QString interlocutorName, const QSt
     , m_apiKey(apiKey)
     , m_url(url)
     , m_model(model)
+    , m_nextNoteId(1)
 {
     qDebug() << "Creating AnthropicInterlocutor url=" << url << "model=" << model;
     m_manager = new QNetworkAccessManager(this);
+    loadNotes();
 }
 
 void AnthropicInterlocutor::sendRequest(const QList<ChatMessage> &history,
@@ -49,8 +57,8 @@ void AnthropicInterlocutor::sendRequest(const QList<ChatMessage> &history,
     payload["model"]      = m_model;
     payload["max_tokens"] = MAX_OUTPUT_TOKENS;
 
-    // 1. System prompt (top-level "system" field in the Anthropic API)
-    //    We combine the personality prompt and the ancient memory into one string.
+    // 1. System prompt (top-level "system" field in the Anthropic API).
+    //    We combine: personality prompt + ancient memory + notes instructions.
     QString fullSystemPrompt;
     if (!m_systemPrompt.isEmpty() && kind != InterlocutorReply::Kind::CurationResult)
     {
@@ -68,6 +76,31 @@ void AnthropicInterlocutor::sendRequest(const QList<ChatMessage> &history,
             "Do not reference it explicitly unless needed.\n" +
             ancientMemory;
     }
+
+    // Notes / scrapbook system (same as DeepSeekInterlocutor)
+    QSettings settings("Tether", "ChatApp");
+    if (settings.value("chat/deepSeekNotesEnabled", true).toBool())
+    {
+        if (!fullSystemPrompt.isEmpty())
+            fullSystemPrompt += "\n\n";
+        QString notesContent = getNotesString();
+        if (notesContent.isEmpty())
+        {
+            notesContent = "(No notes currently saved. Feel free to add some by using NOTE{...}, "
+                           "QUESTION{...} or IDEA{...}!)";
+        }
+        fullSystemPrompt +=
+            "You are equipped with a personal notebook to act as your long-term memory and scratchpad. "
+            "Whenever you include 'NOTE{...}', 'QUESTION{...}', or 'IDEA{...}' in your responses, the "
+            "text inside the curly braces will be appended to your personal notes. Each note is "
+            "assigned a unique ID. If you wish to delete a note, simply output 'DELETE{<ID>}' in your "
+            "response. These notes are preserved across sessions and provided to you in every prompt. "
+            "Notes are optional—you don't have to include one with every message—but you can use them "
+            "to keep track of things you want to remember over the long term. "
+            "Here is the current state of your personal notes:\n\n" +
+            notesContent;
+    }
+
     if (!fullSystemPrompt.isEmpty())
     {
         payload["system"] = fullSystemPrompt;
@@ -154,6 +187,10 @@ void AnthropicInterlocutor::sendRequest(const QList<ChatMessage> &history,
                     }
                 }
 
+                // Process notes/ideas/questions/deletes embedded in the reply,
+                // then strip the tags from the displayed text if needed.
+                cleanReply.text = processNotesFromReply(cleanReply.text);
+
                 // 4) Check for stop_reason to detect incomplete responses
                 //    "max_tokens" means the output was truncated
                 const QString stopReason = responseObj.value("stop_reason").toString();
@@ -205,5 +242,112 @@ void AnthropicInterlocutor::deleteFile(const QString &fileId)
 {
     Q_UNUSED(fileId);
     emit fileDeleted(fileId, false);
+}
+
+// ── Notes / scrapbook helpers ────────────────────────────────────────────────
+// Implementation is identical in spirit to DeepSeekInterlocutor.
+
+void AnthropicInterlocutor::loadNotes()
+{
+    QString path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) +
+                   "/TetherChats/" + m_interlocutorName + "_notes.md";
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+
+    QString content = file.readAll();
+    file.close();
+
+    QRegularExpression re("^(\\d+):\\s+(.*?)(?=\\n^\\d+:\\s+|\\z)",
+                          QRegularExpression::MultilineOption |
+                              QRegularExpression::DotMatchesEverythingOption);
+    QRegularExpressionMatchIterator it = re.globalMatch(content);
+    while (it.hasNext())
+    {
+        QRegularExpressionMatch match = it.next();
+        int id      = match.captured(1).toInt();
+        QString note = match.captured(2).trimmed();
+        m_notes[id] = note;
+        if (id >= m_nextNoteId)
+            m_nextNoteId = id + 1;
+    }
+}
+
+void AnthropicInterlocutor::saveNotes()
+{
+    QString dirPath =
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/TetherChats";
+    QDir dir;
+    if (!dir.exists(dirPath))
+        dir.mkpath(dirPath);
+
+    QString path = dirPath + "/" + m_interlocutorName + "_notes.md";
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        qWarning() << "AnthropicInterlocutor: Could not open notes file for writing:" << path;
+        return;
+    }
+    QTextStream out(&file);
+    for (auto it = m_notes.begin(); it != m_notes.end(); ++it)
+        out << it.key() << ": " << it.value() << "\n";
+    file.close();
+}
+
+QString AnthropicInterlocutor::getNotesString() const
+{
+    QString result;
+    for (auto it = m_notes.begin(); it != m_notes.end(); ++it)
+        result += QString::number(it.key()) + ": " + it.value() + "\n";
+    return result;
+}
+
+QString AnthropicInterlocutor::processNotesFromReply(const QString &replyText)
+{
+    bool notesChanged = false;
+
+    // Process additions: NOTE{...}, IDEA{...}, QUESTION{...}
+    QRegularExpression addRe("(?:NOTE|QUESTION|IDEA)\\{(.*?)\\}",
+                             QRegularExpression::DotMatchesEverythingOption);
+    QRegularExpressionMatchIterator addIt = addRe.globalMatch(replyText);
+    while (addIt.hasNext())
+    {
+        QRegularExpressionMatch match = addIt.next();
+        QString noteContent = match.captured(0).trimmed(); // stores the full 'NOTE{xyz}' string
+        if (!noteContent.isEmpty())
+        {
+            m_notes[m_nextNoteId++] = noteContent;
+            notesChanged = true;
+        }
+    }
+
+    // Process deletions: DELETE{id}
+    QRegularExpression delRe("DELETE\\{(\\d+)\\}");
+    QRegularExpressionMatchIterator delIt = delRe.globalMatch(replyText);
+    while (delIt.hasNext())
+    {
+        QRegularExpressionMatch match = delIt.next();
+        int id = match.captured(1).toInt();
+        if (m_notes.contains(id))
+        {
+            m_notes.remove(id);
+            notesChanged = true;
+        }
+    }
+
+    if (notesChanged)
+        saveNotes();
+
+    // Strip note/delete tags from displayed text when the user opted out of seeing them
+    QSettings settings("Tether", "ChatApp");
+    if (!settings.value("chat/displayNotesEnabled", true).toBool())
+    {
+        QString cleanedText = replyText;
+        cleanedText.remove(addRe);
+        cleanedText.remove(delRe);
+        return cleanedText.trimmed();
+    }
+
+    return replyText;
 }
 // End source file AnthropicInterlocutor.cpp
