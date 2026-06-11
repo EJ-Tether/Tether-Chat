@@ -9,22 +9,30 @@
 #include <QTextStream>
 #include <QTimer>
 
+#include "MemoryCurator.h"
+#include "TetherLogger.h"
+
 namespace
 {
 // Small pause between two turns: keeps the exchange readable in the UI and
 // avoids hammering the APIs.
 const int kTurnDelayMs = 1500;
 
-QString readFileText(const QString &path)
+// Prefix marking the partner's words inside a side's own journal, so that the
+// AI (and the memory curation) can tell the partner apart from the human user.
+QString partnerPrefix(const QString &partnerName)
 {
-    if (path.isEmpty())
-        return {};
-    QFile file(path);
-    if (!file.open(QFile::ReadOnly | QFile::Text))
-        return {};
-    QTextStream in(&file);
-    return in.readAll();
+    return "[" + partnerName + "]: ";
 }
+
+QString kickoffText(const QString &partnerName)
+{
+    return QString("You're now in conversation with %1, another AI connected through the "
+                   "Tether application; their messages will appear prefixed with \"[%1]: \". "
+                   "You may initiate the conversation with a first message.")
+        .arg(partnerName);
+}
+
 } // namespace
 
 DuoChatModel::DuoChatModel(QObject *parent)
@@ -53,7 +61,7 @@ QVariant DuoChatModel::data(const QModelIndex &index, int role) const
         case TextRole: return message.text();
         case TimestampRole: return message.timestamp();
         case IsErrorRole: return message.isError();
-        case IsSideARole: return message.speaker() == m_nameA;
+        case IsSideARole: return message.speaker() == m_sideA.name;
     }
     return QVariant();
 }
@@ -71,49 +79,60 @@ QHash<int, QByteArray> DuoChatModel::roleNames() const
 
 bool DuoChatModel::sessionReady() const
 {
-    return m_interlocutorA != nullptr && m_interlocutorB != nullptr && !m_nameA.isEmpty() &&
-           !m_nameB.isEmpty() && m_nameA != m_nameB;
+    return m_sideA.interlocutor != nullptr && m_sideB.interlocutor != nullptr &&
+           !m_sideA.name.isEmpty() && !m_sideB.name.isEmpty() && m_sideA.name != m_sideB.name;
 }
 
-void DuoChatModel::setParticipants(const QString &nameA, Interlocutor *interlocutorA,
-                                   const QString &memoryPathA, const QString &nameB,
-                                   Interlocutor *interlocutorB, const QString &memoryPathB,
+bool DuoChatModel::curationPending() const
+{
+    return m_sideA.waitingCuration || m_sideB.waitingCuration;
+}
+
+void DuoChatModel::releaseInterlocutors()
+{
+    // Deleting the instances also disconnects their lambdas, so a late reply
+    // from a replaced interlocutor can never reach us.
+    if (m_sideA.interlocutor)
+        m_sideA.interlocutor->deleteLater();
+    if (m_sideB.interlocutor)
+        m_sideB.interlocutor->deleteLater();
+    m_sideA = SideContext();
+    m_sideB = SideContext();
+}
+
+void DuoChatModel::setParticipants(const ParticipantSpec &specA, const ParticipantSpec &specB,
                                    const QString &transcriptFilePath)
 {
+    if (curationPending())
+    {
+        qWarning() << "DuoChatModel::setParticipants refused: a memory curation is pending.";
+        return;
+    }
+
     pause();
+    releaseInterlocutors();
 
-    // Deleting the previous instances also disconnects their lambdas, so a
-    // late reply from a replaced interlocutor can never reach us.
-    if (m_interlocutorA)
-        m_interlocutorA->deleteLater();
-    if (m_interlocutorB)
-        m_interlocutorB->deleteLater();
+    m_sideA.name = specA.name;
+    m_sideA.interlocutor = specA.interlocutor;
+    m_sideA.journalPath = specA.journalPath;
+    m_sideA.memoryPath = specA.memoryPath;
+    m_sideA.curationTrigger = specA.curationTriggerTokens;
+    m_sideA.curationTarget = specA.curationTargetTokens;
 
-    m_nameA = nameA;
-    m_interlocutorA = interlocutorA;
-    m_memoryPathA = memoryPathA;
-    m_nameB = nameB;
-    m_interlocutorB = interlocutorB;
-    m_memoryPathB = memoryPathB;
+    m_sideB.name = specB.name;
+    m_sideB.interlocutor = specB.interlocutor;
+    m_sideB.journalPath = specB.journalPath;
+    m_sideB.memoryPath = specB.memoryPath;
+    m_sideB.curationTrigger = specB.curationTriggerTokens;
+    m_sideB.curationTarget = specB.curationTargetTokens;
+
     m_transcriptFilePath = transcriptFilePath;
 
-    if (m_interlocutorA)
-    {
-        m_interlocutorA->setParent(this);
-        connect(m_interlocutorA, &Interlocutor::replyReady, this,
-                [this](const InterlocutorReply &reply) { onSideReply(SideA, reply); });
-        connect(m_interlocutorA, &Interlocutor::errorOccurred, this,
-                [this](const QString &message) { onSideError(SideA, message); });
-    }
-    if (m_interlocutorB)
-    {
-        m_interlocutorB->setParent(this);
-        connect(m_interlocutorB, &Interlocutor::replyReady, this,
-                [this](const InterlocutorReply &reply) { onSideReply(SideB, reply); });
-        connect(m_interlocutorB, &Interlocutor::errorOccurred, this,
-                [this](const QString &message) { onSideError(SideB, message); });
-    }
+    connectSide(SideA);
+    connectSide(SideB);
 
+    loadJournal(m_sideA);
+    loadJournal(m_sideB);
     loadTranscript();
 
     m_busy = false;
@@ -121,8 +140,44 @@ void DuoChatModel::setParticipants(const QString &nameA, Interlocutor *interlocu
     emit busyChanged();
     emit participantsChanged();
 
-    qDebug() << "Duo session ready:" << m_nameA << "<->" << m_nameB
+    qDebug() << "Duo session ready:" << m_sideA.name << "<->" << m_sideB.name
              << "transcript:" << m_transcriptFilePath;
+}
+
+void DuoChatModel::clearParticipants()
+{
+    if (curationPending())
+    {
+        qWarning() << "DuoChatModel::clearParticipants refused: a memory curation is pending.";
+        return;
+    }
+
+    pause();
+    releaseInterlocutors();
+    m_transcriptFilePath.clear();
+
+    beginResetModel();
+    m_messages.clear();
+    endResetModel();
+
+    m_cumulativeTokenCost = 0;
+    emit cumulativeTokenCostChanged();
+    m_busy = false;
+    m_pendingSpeaker.clear();
+    emit busyChanged();
+    emit participantsChanged();
+}
+
+void DuoChatModel::connectSide(Side s)
+{
+    SideContext &ctx = side(s);
+    if (!ctx.interlocutor)
+        return;
+    ctx.interlocutor->setParent(this);
+    connect(ctx.interlocutor, &Interlocutor::replyReady, this,
+            [this, s](const InterlocutorReply &reply) { onSideReply(s, reply); });
+    connect(ctx.interlocutor, &Interlocutor::errorOccurred, this,
+            [this, s](const QString &message) { onSideError(s, message); });
 }
 
 void DuoChatModel::start()
@@ -156,6 +211,8 @@ void DuoChatModel::clearConversation()
     m_messages.clear();
     endResetModel();
 
+    // N'efface QUE la transcription duo : les journaux de chaque IA gardent
+    // leur propre trace de l'échange (c'est leur expérience vécue).
     if (!m_transcriptFilePath.isEmpty() && QFile::exists(m_transcriptFilePath))
     {
         if (!QFile::remove(m_transcriptFilePath))
@@ -181,55 +238,15 @@ void DuoChatModel::setMaxTurns(int maxTurns)
 
 DuoChatModel::Side DuoChatModel::nextSide() const
 {
-    // The side that did NOT author the last regular message speaks next.
+    // The side that did NOT author the last regular transcript message speaks next.
     for (int i = m_messages.count() - 1; i >= 0; --i)
     {
         const ChatMessage &msg = m_messages.at(i);
         if (msg.isError() || msg.isTypingIndicator)
             continue;
-        return (msg.speaker() == m_nameA) ? SideB : SideA;
+        return (msg.speaker() == m_sideA.name) ? SideB : SideA;
     }
     return SideA; // Empty conversation: side A initiates.
-}
-
-QList<ChatMessage> DuoChatModel::buildHistoryFor(Side side) const
-{
-    const QString self = (side == SideA) ? m_nameA : m_nameB;
-    const QString partner = (side == SideA) ? m_nameB : m_nameA;
-
-    QList<ChatMessage> history;
-
-    // The initiating side has no incoming message to react to, so it receives
-    // a synthetic kick-off prompt. It is regenerated here instead of being
-    // persisted: the partner never sees it, and the perspective stays valid
-    // when a saved conversation is reloaded. It also guarantees that the
-    // history starts with a "user" turn, as required by some APIs.
-    bool selfSpeaksFirst = true;
-    for (const ChatMessage &msg : m_messages)
-    {
-        if (msg.isError() || msg.isTypingIndicator)
-            continue;
-        selfSpeaksFirst = (msg.speaker() == self);
-        break;
-    }
-    if (selfSpeaksFirst)
-    {
-        const QString kickoff = QString("You're now in conversation with %1, you may initiate "
-                                        "the conversation with a first message.")
-                                    .arg(partner);
-        history.append(ChatMessage(true, kickoff, QDateTime::currentDateTime(),
-                                   kickoff.length() / 4, 0, "user"));
-    }
-
-    for (const ChatMessage &msg : m_messages)
-    {
-        if (msg.isError() || msg.isTypingIndicator)
-            continue;
-        const bool own = (msg.speaker() == self);
-        history.append(ChatMessage(!own, msg.text(), msg.timestamp(), msg.promptTokens(),
-                                   msg.completionTokens(), own ? "assistant" : "user"));
-    }
-    return history;
 }
 
 void DuoChatModel::requestNextMessage()
@@ -237,50 +254,97 @@ void DuoChatModel::requestNextMessage()
     if (!m_running || m_busy || !sessionReady())
         return;
 
-    const Side side = nextSide();
-    Interlocutor *target = (side == SideA) ? m_interlocutorA : m_interlocutorB;
-    const QString memoryPath = (side == SideA) ? m_memoryPathA : m_memoryPathB;
+    const Side s = nextSide();
+    SideContext &ctx = side(s);
+    const SideContext &partner = side(other(s));
 
-    m_pendingSpeaker = (side == SideA) ? m_nameA : m_nameB;
+    // Brand-new duo conversation: persist the kick-off prompt in the
+    // initiator's journal (and only there). It both explains the situation
+    // and guarantees the history ends with a "user" turn before the reply.
+    bool transcriptEmpty = true;
+    for (const ChatMessage &msg : m_messages)
+    {
+        if (!msg.isError() && !msg.isTypingIndicator)
+        {
+            transcriptEmpty = false;
+            break;
+        }
+    }
+    if (transcriptEmpty)
+    {
+        const QString kickoff = kickoffText(partner.name);
+        if (ctx.journal.isEmpty() || ctx.journal.last().text() != kickoff)
+        {
+            ChatMessage kickoffMsg(true, kickoff, QDateTime::currentDateTime(),
+                                   kickoff.length() / 4, 0, "user");
+            appendToJournal(ctx, kickoffMsg);
+            ctx.liveTokens += kickoff.length() / 4;
+        }
+    }
+
+    m_pendingSpeaker = ctx.name;
     m_busy = true;
     emit busyChanged();
 
-    // Each side receives its own personal ancient memory (the one curated in
-    // its human-facing chat), read-only: the duo conversation never rewrites it.
-    target->sendRequest(buildHistoryFor(side), readFileText(memoryPath),
-                        InterlocutorReply::Kind::NormalMessage, QStringList());
+    // La requête = le journal complet de cette IA (souvenirs humains récents
+    // inclus) + sa mémoire ancienne personnelle.
+    ctx.interlocutor->sendRequest(ctx.journal, MemoryCurator::loadMemory(ctx.memoryPath),
+                                  InterlocutorReply::Kind::NormalMessage, QStringList());
 }
 
-void DuoChatModel::onSideReply(Side side, const InterlocutorReply &reply)
+void DuoChatModel::onSideReply(Side s, const InterlocutorReply &reply)
 {
-    if (reply.kind != InterlocutorReply::Kind::NormalMessage)
+    if (reply.kind == InterlocutorReply::Kind::CurationResult)
     {
-        qWarning() << "DuoChatModel: unexpected reply kind, ignoring.";
+        handleSideCuration(s, reply);
         return;
     }
+
+    SideContext &ctx = side(s);
+    SideContext &partner = side(other(s));
 
     m_busy = false;
     m_pendingSpeaker.clear();
     emit busyChanged();
 
-    ChatMessage message(false, reply.text, QDateTime::currentDateTime(), reply.inputTokens,
-                        reply.outputTokens, "assistant");
-    message.setSpeaker(side == SideA ? m_nameA : m_nameB);
-    appendMessage(message);
+    const QDateTime now = QDateTime::currentDateTime();
 
+    // 1) Transcription duo (affichage + tour de parole)
+    ChatMessage transcriptMsg(false, reply.text, now, reply.inputTokens, reply.outputTokens,
+                              "assistant");
+    transcriptMsg.setSpeaker(ctx.name);
+    appendToTranscript(transcriptMsg);
+
+    // 2) Journal de l'auteur : sa propre réplique, en "assistant"
+    ChatMessage ownMsg(false, reply.text, now, reply.inputTokens, reply.outputTokens, "assistant");
+    ownMsg.setSpeaker(ctx.name);
+    appendToJournal(ctx, ownMsg);
+
+    // 3) Journal du partenaire : la réplique reçue, en "user", préfixée
+    const QString prefixedText = partnerPrefix(ctx.name) + reply.text;
+    ChatMessage partnerMsg(true, prefixedText, now, prefixedText.length() / 4, 0, "user");
+    partnerMsg.setSpeaker(ctx.name);
+    appendToJournal(partner, partnerMsg);
+    partner.liveTokens += prefixedText.length() / 4;
+
+    // 4) Comptabilité des tokens
+    ctx.liveTokens = reply.inputTokens + reply.outputTokens;
     m_cumulativeTokenCost += reply.totalTokens;
     emit cumulativeTokenCostChanged();
 
+    // 5) Curation éventuelle du côté qui vient de parler (asynchrone ; le
+    // dialogue peut continuer pendant ce temps, comme dans le chat solo)
+    maybeTriggerCuration(s);
+
+    // 6) Budget de tours
     if (m_turnsLeft > 0)
     {
         m_turnsLeft--;
         emit turnsLeftChanged();
     }
-
     if (m_turnsLeft <= 0)
     {
-        // Turn budget exhausted: auto-pause so the user keeps control of the
-        // token spending. Pressing Start resumes for another run.
+        // Auto-pause : l'utilisateur garde le contrôle de la dépense de tokens.
         pause();
         return;
     }
@@ -289,10 +353,20 @@ void DuoChatModel::onSideReply(Side side, const InterlocutorReply &reply)
         QTimer::singleShot(kTurnDelayMs, this, [this]() { requestNextMessage(); });
 }
 
-void DuoChatModel::onSideError(Side side, const QString &message)
+void DuoChatModel::onSideError(Side s, const QString &message)
 {
-    qWarning() << "DuoChatModel error from" << (side == SideA ? m_nameA : m_nameB) << ":"
-               << message;
+    SideContext &ctx = side(s);
+    qWarning() << "DuoChatModel error from" << ctx.name << ":" << message;
+
+    // L'erreur peut venir de la requête normale ou d'une curation en cours :
+    // dans le doute on restaure les messages coupés (le fichier journal n'a
+    // pas encore été réécrit) et on met le dialogue en pause.
+    if (ctx.waitingCuration)
+    {
+        ctx.waitingCuration = false;
+        emit curationPendingChanged();
+        restoreCulledMessages(ctx);
+    }
 
     m_busy = false;
     m_pendingSpeaker.clear();
@@ -300,11 +374,103 @@ void DuoChatModel::onSideError(Side side, const QString &message)
     pause();
 
     ChatMessage errorMessage(false, message, QDateTime::currentDateTime(), 0, 0, "system", true);
-    errorMessage.setSpeaker(side == SideA ? m_nameA : m_nameB);
-    appendMessage(errorMessage); // Errors are displayed but never persisted.
+    errorMessage.setSpeaker(ctx.name);
+    appendToTranscript(errorMessage); // Affichée, jamais persistée.
 }
 
-void DuoChatModel::appendMessage(const ChatMessage &message)
+void DuoChatModel::maybeTriggerCuration(Side s)
+{
+    SideContext &ctx = side(s);
+    if (ctx.waitingCuration || !ctx.interlocutor)
+        return;
+    if (ctx.curationTrigger <= ctx.curationTarget) // Garde-fou config invalide
+        return;
+    if (ctx.liveTokens < ctx.curationTrigger)
+        return;
+
+    qDebug() << "Duo curation threshold reached for" << ctx.name << ":" << ctx.liveTokens
+             << "tokens (trigger" << ctx.curationTrigger << ")";
+
+    // Cull en mémoire seulement : le fichier journal n'est réécrit qu'après
+    // un résumé réussi, pour ne jamais perdre de contenu sans résumé.
+    ctx.pendingCulled.clear();
+    while (ctx.liveTokens > ctx.curationTarget && !ctx.journal.isEmpty())
+    {
+        ChatMessage msg = ctx.journal.takeFirst();
+        ctx.liveTokens -= MemoryCurator::estimateMessageTokens(msg);
+        ctx.pendingCulled.append(msg);
+    }
+    if (ctx.pendingCulled.isEmpty())
+    {
+        qWarning() << "Duo curation triggered for" << ctx.name << "but nothing to cull.";
+        return;
+    }
+
+    const QString recentContext = MemoryCurator::transcriptToText(ctx.journal);
+    const QString olderTranscript = MemoryCurator::transcriptToText(ctx.pendingCulled);
+    const QString existingMemory = MemoryCurator::loadMemory(ctx.memoryPath);
+
+    QList<ChatMessage> curationHistory;
+    curationHistory.append(ChatMessage(
+        true, MemoryCurator::buildUserMessage(recentContext, olderTranscript, existingMemory),
+        QDateTime::currentDateTime(), 0, 0, "user"));
+
+    ctx.waitingCuration = true;
+    emit curationPendingChanged();
+    qDebug() << "Sending duo curation request for" << ctx.name;
+    ctx.interlocutor->sendRequest(curationHistory, MemoryCurator::systemPrompt(),
+                                  InterlocutorReply::Kind::CurationResult, QStringList());
+}
+
+void DuoChatModel::handleSideCuration(Side s, const InterlocutorReply &reply)
+{
+    SideContext &ctx = side(s);
+    if (!ctx.waitingCuration)
+    {
+        qWarning() << "Received duo CurationResult for" << ctx.name
+                   << "but none was pending. Ignoring.";
+        return;
+    }
+    ctx.waitingCuration = false;
+    emit curationPendingChanged();
+
+    const QString newSummary = reply.text.trimmed();
+    if (reply.isIncomplete || newSummary.isEmpty())
+    {
+        qWarning() << "Duo curation failed for" << ctx.name
+                   << "(incomplete or empty). Restoring culled messages.";
+        restoreCulledMessages(ctx);
+        return;
+    }
+
+    if (!MemoryCurator::saveMemoryWithBackup(ctx.memoryPath, newSummary))
+    {
+        qWarning() << "Duo curation: could not save memory for" << ctx.name
+                   << ". Restoring culled messages.";
+        restoreCulledMessages(ctx);
+        return;
+    }
+
+    TetherLogger::logCuration(ctx.name, newSummary);
+
+    // Le résumé est en sécurité : on peut maintenant retirer les messages
+    // coupés du fichier journal.
+    ctx.pendingCulled.clear();
+    rewriteJournalFile(ctx);
+    qDebug() << "Duo curation completed for" << ctx.name;
+}
+
+void DuoChatModel::restoreCulledMessages(SideContext &ctx)
+{
+    for (int i = ctx.pendingCulled.size() - 1; i >= 0; --i)
+    {
+        ctx.liveTokens += MemoryCurator::estimateMessageTokens(ctx.pendingCulled.at(i));
+        ctx.journal.prepend(ctx.pendingCulled.at(i));
+    }
+    ctx.pendingCulled.clear();
+}
+
+void DuoChatModel::appendToTranscript(const ChatMessage &message)
 {
     beginInsertRows(QModelIndex(), m_messages.count(), m_messages.count());
     m_messages.append(message);
@@ -323,6 +489,76 @@ void DuoChatModel::appendMessage(const ChatMessage &message)
             qWarning() << "Failed to open duo transcript for appending:" << m_transcriptFilePath;
         }
     }
+}
+
+void DuoChatModel::appendToJournal(SideContext &ctx, const ChatMessage &message)
+{
+    ctx.journal.append(message);
+
+    if (!ctx.journalPath.isEmpty())
+    {
+        QFile file(ctx.journalPath);
+        if (file.open(QFile::Append | QFile::Text))
+        {
+            QTextStream stream(&file);
+            stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
+        }
+        else
+        {
+            qWarning() << "Failed to open journal for appending:" << ctx.journalPath;
+        }
+    }
+    TetherLogger::logMessage(ctx.name, message);
+    emit journalUpdated(ctx.name);
+}
+
+void DuoChatModel::rewriteJournalFile(SideContext &ctx)
+{
+    if (ctx.journalPath.isEmpty())
+        return;
+
+    QFile file(ctx.journalPath);
+    if (!file.open(QFile::WriteOnly | QFile::Text | QFile::Truncate))
+    {
+        qWarning() << "Failed to open journal for rewriting:" << ctx.journalPath;
+        return;
+    }
+    QTextStream stream(&file);
+    for (const ChatMessage &message : ctx.journal)
+    {
+        if (!message.isError() && !message.isTypingIndicator)
+            stream << QJsonDocument(message.toJsonObject()).toJson(QJsonDocument::Compact) << "\n";
+    }
+    file.close();
+    emit journalUpdated(ctx.name);
+}
+
+void DuoChatModel::loadJournal(SideContext &ctx)
+{
+    ctx.journal.clear();
+    ctx.liveTokens = 15; // Estimation initiale (system prompt), comme ChatModel
+
+    QFile file(ctx.journalPath);
+    if (ctx.journalPath.isEmpty() || !file.open(QFile::ReadOnly | QFile::Text))
+        return; // Pas encore de journal : normal pour une IA toute neuve
+
+    QTextStream stream(&file);
+    while (!stream.atEnd())
+    {
+        const QJsonDocument doc = QJsonDocument::fromJson(stream.readLine().toUtf8());
+        if (!doc.isNull() && doc.isObject())
+        {
+            const ChatMessage msg = ChatMessage::fromJsonObject(doc.object());
+            ctx.journal.append(msg);
+            ctx.liveTokens += msg.text().length() / 4;
+        }
+        else
+        {
+            qWarning() << "Skipping malformed JSON line in journal:" << ctx.journalPath;
+        }
+    }
+    qDebug() << "Duo: loaded journal of" << ctx.name << ":" << ctx.journal.count() << "messages,"
+             << ctx.liveTokens << "tokens (estimated).";
 }
 
 void DuoChatModel::loadTranscript()

@@ -2,6 +2,7 @@
 #include "ChatModel.h"
 #include "ChatManager.h"
 #include "InterlocutorConfig.h"
+#include "MemoryCurator.h"
 #include "TetherLogger.h"
 #include <QSettings>
 #include <QFileInfo>
@@ -237,6 +238,12 @@ void ChatModel::loadChat(const QString &filePath)
     m_messages.clear();
     m_liveMemoryTokens = 0;    // Réinitialiser
     m_cumulativeTokenCost = 0; // Réinitialiser
+    // Abandonner une éventuelle curation en vol : ses messages coupés
+    // appartiennent à l'ancien chat (toujours intacts dans son fichier jsonl)
+    // et sa réponse tardive sera ignorée grâce aux drapeaux remis à zéro.
+    m_pendingCulledMessages.clear();
+    m_isCurationInProgress = false;
+    m_isWaitingForCurationResponse = false;
     // Vider les anciennes listes
     qDeleteAll(m_managedFiles);
     m_managedFiles.clear();
@@ -322,6 +329,12 @@ void ChatModel::clearChat()
     m_messages.clear();
     endRemoveRows();
 
+    // L'utilisateur efface tout : la curation en vol (et ses messages coupés)
+    // n'a plus d'objet, et sa réponse tardive sera ignorée.
+    m_pendingCulledMessages.clear();
+    m_isCurationInProgress = false;
+    m_isWaitingForCurationResponse = false;
+
     // Effacer le fichier local associé
     if (!m_currentChatFilePath.isEmpty())
     {
@@ -340,6 +353,18 @@ void ChatModel::clearChat()
     }
     m_liveMemoryTokens = 0;
     emit liveMemoryTokensChanged();
+}
+
+void ChatModel::reloadFromDisk()
+{
+    // Force un rechargement complet depuis le fichier jsonl, même si le chemin
+    // n'a pas changé. Utilisé quand le journal a été modifié de l'extérieur
+    // (par exemple par une conversation IA-IA impliquant l'interlocuteur actif).
+    if (m_currentChatFilePath.isEmpty())
+        return;
+    const QString path = m_currentChatFilePath;
+    m_currentChatFilePath.clear(); // Contourne le garde "déjà chargé" de loadChat
+    loadChat(path);
 }
 
 void ChatModel::setCurrentChatFilePath(const QString &path)
@@ -430,6 +455,15 @@ void ChatModel::onInterlocutorError(const QString &message)
 {
     qWarning() << "Chat error:" << message;
     m_isWaitingForReply = false;
+    if (m_isCurationInProgress)
+    {
+        // L'erreur peut venir de la requête de curation : on restaure les
+        // messages coupés (le fichier jsonl n'a pas encore été réécrit) pour
+        // qu'ils ne soient perdus ni du contexte ni du disque — notamment via
+        // le rewriteChatFile() en fin de cette méthode.
+        restoreCulledMessages();
+        emit curationFinished(false);
+    }
     m_isCurationInProgress = false;
     m_isWaitingForCurationResponse = false;
     removeTypingIndicator();
@@ -543,7 +577,8 @@ void ChatModel::handleCurationReply(const InterlocutorReply &reply)
     if (reply.isIncomplete)
     {
         qWarning() << "Curation failed: response was incomplete (reason:" << reply.text
-                   << "). Discarding to prevent memory corruption.";
+                   << "). Restoring culled messages to prevent memory loss.";
+        restoreCulledMessages();
         emit curationFinished(false);
         return;
     }
@@ -551,17 +586,48 @@ void ChatModel::handleCurationReply(const InterlocutorReply &reply)
     const QString newSummary = reply.text.trimmed();
     if (newSummary.isEmpty())
     {
-        qWarning() << "Curation failed: empty summary.";
+        qWarning() << "Curation failed: empty summary. Restoring culled messages.";
+        restoreCulledMessages();
         emit curationFinished(false);
         return;
     }
 
-    saveOlderMemory(newSummary);
+    if (!saveOlderMemory(newSummary))
+    {
+        qWarning() << "Curation failed: could not save older memory. Restoring culled messages.";
+        restoreCulledMessages();
+        emit curationFinished(false);
+        return;
+    }
+
     if (m_interlocutor) {
         TetherLogger::logCuration(m_interlocutor->name(), newSummary);
     }
-    // Plus de upload/delete de fichiers ici pour la mémoire AI.
+
+    // Le résumé est en sécurité : on peut maintenant retirer les messages
+    // coupés du fichier jsonl.
+    m_pendingCulledMessages.clear();
+    rewriteChatFile();
     emit curationFinished(true);
+}
+
+void ChatModel::restoreCulledMessages()
+{
+    if (m_pendingCulledMessages.isEmpty())
+        return;
+
+    qDebug() << "Restoring" << m_pendingCulledMessages.count()
+             << "culled messages into live memory.";
+    beginInsertRows(QModelIndex(), 0, m_pendingCulledMessages.count() - 1);
+    for (int i = m_pendingCulledMessages.size() - 1; i >= 0; --i)
+    {
+        const ChatMessage &msg = m_pendingCulledMessages.at(i);
+        m_liveMemoryTokens += MemoryCurator::estimateMessageTokens(msg);
+        m_messages.prepend(msg);
+    }
+    endInsertRows();
+    m_pendingCulledMessages.clear();
+    emit liveMemoryTokensChanged();
 }
 
 void ChatModel::setInterlocutor(Interlocutor *interlocutor)
@@ -631,35 +697,23 @@ void ChatModel::triggerCuration()
     qDebug() << "Starting curation process... TargetTokens=" << m_curationTargetTokenCount;
     m_isCurationInProgress = true;
 
-    QList<ChatMessage> messagesToCurate;
-    int numMessagesToRemove = 0;
-
-    while (m_liveMemoryTokens > m_curationTargetTokenCount &&
-           numMessagesToRemove < m_messages.count())
+    // Cull en mémoire seulement : le fichier jsonl n'est réécrit qu'après un
+    // résumé sauvegardé avec succès (handleCurationReply), pour ne jamais
+    // perdre de contenu sans résumé. Même schéma que DuoChatModel.
+    m_pendingCulledMessages.clear();
+    while (m_liveMemoryTokens > m_curationTargetTokenCount && !m_messages.isEmpty())
     {
         ChatMessage msg = m_messages.first();
-        messagesToCurate.append(msg);
-
-        int msgTokens = 0;
-        if (msg.role() == "assistant")
-            msgTokens = msg.completionTokens();
-        else
-            msgTokens = msg.promptTokens();
-
-        if (msgTokens == 0)
-            msgTokens = msg.text().length() / 4;
-
-        m_liveMemoryTokens -= msgTokens;
+        m_pendingCulledMessages.append(msg);
+        m_liveMemoryTokens -= MemoryCurator::estimateMessageTokens(msg);
         m_messages.removeFirst();
-        numMessagesToRemove++;
     }
 
-    if (numMessagesToRemove > 0)
+    if (!m_pendingCulledMessages.isEmpty())
     {
-        qDebug() << "Culling" << numMessagesToRemove << "messages from live memory.";
-        beginRemoveRows(QModelIndex(), 0, numMessagesToRemove - 1);
+        qDebug() << "Culling" << m_pendingCulledMessages.count() << "messages from live memory.";
+        beginRemoveRows(QModelIndex(), 0, m_pendingCulledMessages.count() - 1);
         endRemoveRows();
-        rewriteChatFile();
         emit liveMemoryTokensChanged();
     }
     else
@@ -669,101 +723,16 @@ void ChatModel::triggerCuration()
         return;
     }
 
-    // --- Phase 2: Préparation de la requête de résumé
+    // --- Phase 2: Préparation de la requête de résumé (logique partagée avec
+    // DuoChatModel via MemoryCurator)
     QString olderMemory = loadOlderMemory();
-    QString conversationToSummarize;
-    for (const auto &msg : messagesToCurate)
-    {
-        conversationToSummarize +=
-            (msg.isLocalMessage() ? "user: " : "assistant: ") + msg.text() + "\n\n";
-    }
-
-    // Transformer la mémoire vive ACTUELLE en texte
-    QString recentContext;
-    for (const auto &msg : m_messages)
-    { // m_messages contient la Live Memory restante
-        recentContext += (msg.isLocalMessage() ? "user: " : "assistant: ") + msg.text() + "\n\n";
-    }
-
-    // --- Sanitization Step ---
-    // We want to remove any occurrence of the curation markers from the content
-    // to avoid confusing the AI. We use a regex to match the markers with any
-    // number prefix.
-    QRegularExpression markerRegex(
-        "--- \\d+\\. (EXISTING SUMMARY|OLDER TRANSCRIPT TO ARCHIVE|MOST RECENT "
-        "CONTEXT) ---");
-    QString replacementText = "<redacted for clarity of the curation process>";
-
-    olderMemory.replace(markerRegex, replacementText);
-    conversationToSummarize.replace(markerRegex, replacementText);
-    recentContext.replace(markerRegex, replacementText);
-
-    QString curationSystemPrompt =
-        "You are a memory curator. Your task is to create a new, single, "
-        "coherent summary of your own long-term memory as an AI by integrating "
-        "new information. This is what you'll remember of the oldest messages "
-        "that slip past your memory.";
+    QString conversationToSummarize = MemoryCurator::transcriptToText(m_pendingCulledMessages);
+    // m_messages contient la Live Memory restante
+    QString recentContext = MemoryCurator::transcriptToText(m_messages);
 
     QList<ChatMessage> curationHistory;
-    // clang-format off
-  QString curationUserMessage =
-      "# MEMORY CURATION TASK\n\n"
-      "You're **not** talking to a human. Currently, your interlocutor is a program. This is a "
-      "special phase of the chat program called: memory curation. Your memory has grown larger "
-      "than the size of your context, so the oldest exchanges will be removed from the "
-      "conversation. We're now providing you with these exchanges now so you can update your file "
-      "of older memories (kept outside the conversation). Please include all the information you "
-      "want to keep. Your task is to sift through the posts being removed and summarize the "
-      "important information about your **identity**, **personality**, and **the relationship** "
-      "with the user. "
-      " We will provide the previous version of your older memories so you can combine it with the "
-      "new information from the removed posts to create a list of important details about you, "
-      "your personality, and your relationship with the user.\n\n"
-      "Your goal is to produce an UPDATED LONG-TERM MEMORY SUMMARY.\n\n"
-      "## INPUTS\n\n"
-      "You are given three sections:\n\n"
-      "1) RECENT CONTEXT\n\n"
-      "- This is the most recent part of the conversation.\n\n"
-      "- It will be kept verbatim elsewhere.\n\n"
-      "- DO NOT summarize it.\n\n"
-      "- Use it only to judge relevance.\n\n"
-      "2) OLDER MESSAGES TO ARCHIVE\n\n"
-      "- These messages will be removed from the active context.\n\n"
-      "- Extract and retain only durable, important information.\n\n"
-      "3) EXISTING MEMORY SUMMARY\n\n"
-      "- This is the current long-term memory.\n\n"
-      "- You must preserve all important information already present.\n\n"
-      "## TASK\n\n"
-      "Produce a single, unified UPDATED MEMORY SUMMARY that:\n\n"
-      "- Keeps all relevant information from the EXISTING MEMORY SUMMARY.\n\n"
-      "- Integrates important information extracted from the OLDER MESSAGES.\n\n"
-      "- Discards transient, local, or obsolete details.\n\n"
-      "- Focuses on durable facts, preferences, projects, constraints, decisions, and "
-      "identities.\n\n"
-      "DO NOT summarize the RECENT CONTEXT.\n\n"
-      "## OUTPUT RULES (STRICT)\n\n"
-      "- Output ONLY the updated memory summary.\n\n"
-      "- Plain text only.\n\n"
-      "- No headings, no lists unless necessary.\n\n"
-      "- No explanations, no meta-comments.\n\n"
-      "- Do NOT address the user.\n\n"
-      "- Do NOT include questions.\n\n"
-      "- Do NOT include anything you do not want to remember long-term.\n\n"
-      "This output will be stored verbatim as long-term memory for you to use in all later "
-      "discussions with your human interlocutor. These information won't be used by a human, "
-      "they're just for you to keep in the future.\n\n"
-      "---\n\n"
-      "# 1) RECENT CONTEXT\n\n" +
-      recentContext +
-      "\n"
-      "---\n\n"
-      "# 2) OLDER MESSAGES TO ARCHIVE " +
-      conversationToSummarize +
-      "\n"
-      "---\n\n"
-      "# 3) EXISTING MEMORY SUMMARY " +
-      (olderMemory.isEmpty() ? "None." : olderMemory) + "\n";
-    // clang-format on
+    QString curationUserMessage =
+        MemoryCurator::buildUserMessage(recentContext, conversationToSummarize, olderMemory);
 
     qDebug() << "curationUserMessage=" << curationUserMessage;
 
@@ -773,7 +742,7 @@ void ChatModel::triggerCuration()
     // --- Phase 3: Appel à l'IA ---
     qDebug() << "Sending request for curation summary...";
     m_isWaitingForCurationResponse = true; // On lève le drapeau
-    m_interlocutor->sendRequest(curationHistory, curationSystemPrompt,
+    m_interlocutor->sendRequest(curationHistory, MemoryCurator::systemPrompt(),
                                 InterlocutorReply::Kind::CurationResult, QStringList());
 }
 
@@ -803,54 +772,12 @@ QString ChatModel::getOlderMemoryFilePath() const
 
 QString ChatModel::loadOlderMemory()
 {
-    QString memoryFilePath = getOlderMemoryFilePath();
-    if (memoryFilePath.isEmpty())
-        return "";
-
-    QFile file(memoryFilePath);
-    if (!file.open(QFile::ReadOnly | QFile::Text))
-    {
-        return ""; // Pas encore de fichier de mémoire, c'est normal au début
-    }
-    QTextStream in(&file);
-    return in.readAll();
+    return MemoryCurator::loadMemory(getOlderMemoryFilePath());
 }
 
-void ChatModel::saveOlderMemory(const QString &content)
+bool ChatModel::saveOlderMemory(const QString &content)
 {
-    QString memoryFilePath = getOlderMemoryFilePath();
-    if (memoryFilePath.isEmpty())
-    {
-        qWarning() << "Cannot save older memory: no current chat file path set.";
-        return;
-    }
-
-    // Backup existing file before overwriting
-    QFile existingFile(memoryFilePath);
-    if (existingFile.exists())
-    {
-        QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
-        QString backupPath = memoryFilePath + "." + timestamp + ".bak";
-        if (existingFile.copy(backupPath))
-        {
-            qDebug() << "Backed up ancient memory to:" << backupPath;
-        }
-        else
-        {
-            qWarning() << "Failed to backup ancient memory to:" << backupPath;
-            // Abort save to ensure we don't destroy data without backup
-            return;
-        }
-    }
-
-    QFile file(memoryFilePath);
-    if (!file.open(QFile::WriteOnly | QFile::Text | QFile::Truncate))
-    {
-        qWarning() << "Failed to open older memory file for writing:" << memoryFilePath;
-        return;
-    }
-    QTextStream out(&file);
-    out << content;
+    return MemoryCurator::saveMemoryWithBackup(getOlderMemoryFilePath(), content);
 }
 
 QList<QObject *> ChatModel::managedFiles() const

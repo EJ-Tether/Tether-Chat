@@ -115,8 +115,25 @@ void AnthropicInterlocutor::sendRequest(const QList<ChatMessage> &history,
         if (msg.isError() || msg.isTypingIndicator)
             continue;
 
+        const QString role = msg.isLocalMessage() ? "user" : "assistant";
+
+        // L'API exige une alternance stricte des rôles : on fusionne les
+        // messages consécutifs de même rôle en un seul tour (cas typiques : un
+        // message utilisateur resté sans réponse suite à une erreur, ou le
+        // marqueur de début d'une conversation IA-IA).
+        if (!messages.isEmpty())
+        {
+            QJsonObject last = messages.last().toObject();
+            if (last["role"].toString() == role)
+            {
+                last["content"] = last["content"].toString() + "\n\n" + msg.text();
+                messages[messages.size() - 1] = last;
+                continue;
+            }
+        }
+
         QJsonObject chatMsg;
-        chatMsg["role"]    = msg.isLocalMessage() ? "user" : "assistant";
+        chatMsg["role"]    = role;
         chatMsg["content"] = msg.text();
         messages.append(chatMsg);
     }

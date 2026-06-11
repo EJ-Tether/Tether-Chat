@@ -46,6 +46,7 @@ public:
     // Méthodes Q_INVOKABLE pour QML
     Q_INVOKABLE void sendMessage(const QString &message);
     Q_INVOKABLE void loadChat(const QString &filePath);
+    Q_INVOKABLE void reloadFromDisk();
     Q_INVOKABLE void saveChat();
     Q_INVOKABLE void clearChat();
 
@@ -133,12 +134,17 @@ private:
     QString getOlderMemoryFilePath()
         const;                 // Donne le chemin du fichier de mémoire ancienne
     QString loadOlderMemory(); // Charge le contenu de la mémoire ancienne
-    void
-    saveOlderMemory(const QString &content); // Sauvegarde la mémoire ancienne
+    // Sauvegarde la mémoire ancienne; false si la sauvegarde a échoué
+    bool saveOlderMemory(const QString &content);
 
     // Flags pour gérer le processus de curation asynchrone
     bool m_isCurationInProgress = false;
     bool m_isWaitingForCurationResponse = false;
+    // Messages coupés du contexte vif, pas encore validés sur disque : le
+    // fichier jsonl n'est réécrit qu'après un résumé sauvegardé avec succès;
+    // en cas d'échec ils sont restaurés dans le modèle.
+    QList<ChatMessage> m_pendingCulledMessages;
+    void restoreCulledMessages();
     QString m_liveMemoryFileIdForCuration;
     QString m_oldAncientMemoryFileIdToDelete;
 

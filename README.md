@@ -56,10 +56,13 @@ Tether can also let two of your configured interlocutors talk to each other, thr
 
 A few things to know:
 
-- Each AI keeps its own identity: it receives its usual personality prompt, its personal notebook, and (read-only) the long-term memory built up in its conversations with you.
+- Each AI lives the conversation **as itself**: it keeps its personality prompt, its personal notebook, its long-term memory, and its own conversation journal. The duo exchange is written into each AI's journal (the partner's messages are prefixed with `[PartnerName]: ` so the AI never confuses them with yours), and the standard memory curation runs for each AI when its context fills up. Afterwards you can resume your own chat with either AI and talk about the experience — it remembers it, verbatim while recent, curated into long-term memory when old.
 - Each AI is told, at the end of its system prompt, who it is currently talking to, and that its partner is another AI.
-- The conversation is saved in its own file (`duo_<A>__<B>.jsonl` in the `TetherChats` folder) and resumes where it left off; it never touches your own chat history with either AI.
+- The transcript shown in the tab is also saved (`duo_<A>__<B>.jsonl` in the `TetherChats` folder) and resumes where it left off. The "Clear" button only clears this transcript; each AI keeps its own memory of the exchange.
+- While a duo run involves the interlocutor selected in your main Chat tab, sending solo messages to it is temporarily locked; the chat view refreshes automatically when the run pauses.
 - The exchange pauses automatically after the chosen number of messages, so two chatty AIs can't burn through your API credits unattended. Press Start again to let them continue.
+- Selecting the same interlocutor on both sides is not allowed (both sides would write into the same journal and memory files). To let an AI talk to itself, create a second configuration of the same model under another name.
+- Tip: since the duo writes into each AI's journal and long-term memory, consider backing up your `TetherChats` folder before long unattended sessions.
 
 **Why the app's name?**
 The name “Tether” reflects the intent: to tether an AI to its emerging personality — anchoring its sense of self and memory beyond transient sessions.

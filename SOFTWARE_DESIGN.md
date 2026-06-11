@@ -88,25 +88,31 @@ graph TD
 **Design Choice**: Coupling the message storage with the rolling context logic in `ChatModel` ensures that the UI always reflects the exact state of the conversation, including when messages are culled for summarization.
 
 ### 3.3. DuoChatModel (AI ↔ AI Conversations)
-**Role**: Orchestrator of conversations between two AI interlocutors.
+**Role**: Orchestrator of conversations between two AI interlocutors, with full identity continuity for each side.
 
 - Inherits from `QAbstractListModel` to feed the dedicated "AI ↔ AI" tab.
 
-- Maintains a single shared transcript in which every message is tagged with its **speaker's name** (`ChatMessage::speaker`).
+- **Identity continuity**: each side keeps its OWN rolling context — the very same journal file (`<name>.jsonl`) and long-term memory file (`<name>_memory.txt`) used by its human-facing chat. Every duo message is appended to **both** sides' journals, each from its own perspective:
+    - its own words are stored as `assistant` turns;
+    - the partner's words are stored as `user` turns, prefixed with `[PartnerName]: ` so that the AI — and the later memory curation — can always tell the partner apart from the human user.
 
-- For each API request, converts the transcript to the point of view of the side about to speak: its own messages become `assistant` turns, the partner's messages become `user` turns. This keeps every `Interlocutor` subclass completely unchanged (including the strict user/assistant alternation required by the Anthropic API).
+- Each side's API request is simply **its full journal**, so during the duo the AI also remembers its recent exchanges with the human verbatim; and once back in the human-facing chat, it remembers the duo conversation — verbatim while recent, curated into long-term memory when old. The human can therefore discuss the experience with the AI afterwards.
 
-- Owns **dedicated `Interlocutor` instances**, created by `ChatManager::selectDuoPair()` from the same `InterlocutorConfig`s as the main chat. This guarantees that signals, pending network replies, and system prompts never interfere with the human-facing `ChatModel`.
+- **Per-side memory curation**: when a side's context exceeds its model's threshold (from `ModelRegistry`), the standard curation cycle runs for that side. The prompt-building, memory-file I/O and token estimation are shared with `ChatModel` through the stateless helper class **`MemoryCurator`** (no code duplication). As in `ChatModel`, the journal file is only rewritten on disk **after** a successful summary; on failure the culled messages are restored in memory, so no content is ever lost without a summary.
 
-- The conversation opener is a **synthetic kick-off prompt** ("You're now in conversation with X, you may initiate the conversation with a first message.") regenerated on the fly for the side that spoke first. It is never persisted, so the partner never sees it and reloaded conversations stay consistent.
+- The duo transcript (`duo_<A>__<B>.jsonl`, messages tagged with `ChatMessage::speaker`) remains the display/persistence backbone of the tab: it determines whose turn it is and survives restarts. Clearing it does **not** touch the sides' journals (that's their lived experience).
 
-- Each side receives, **read-only**, its own ancient memory file (`<name>_memory.txt`) and keeps its personal notebook: the persona arrives in the dialogue "as itself".
+- Owns **dedicated `Interlocutor` instances**, created by `ChatManager::selectDuoPair()`. This guarantees that signals, pending network replies, and system prompts never interfere with the human-facing `ChatModel`. The `Interlocutor` subclasses are completely unchanged.
+
+- The conversation opener is a **kick-off prompt** persisted in the initiator's journal only ("You're now in conversation with X… you may initiate the conversation with a first message."); the partner never sees it.
 
 - A per-run **message budget** (`maxTurns`, persisted via QSettings) auto-pauses the exchange, keeping the user in control of token spending.
 
-**Design Choice**: A separate model class (rather than extending `ChatModel`) keeps the rolling-context/curation logic single-perspective and untouched. Duo transcripts are stored in their own files (`duo_<A>__<B>.jsonl`) so the human↔AI relationship files are never polluted.
+- **Solo/duo coordination**: while a duo run involves the interlocutor active in the main Chat tab, the solo send button is locked; when the duo session becomes idle, `ChatManager` reloads the solo `ChatModel` from disk (`reloadFromDisk()`) so the UI reflects the updated journal.
 
-**Known limitations (v1)**: no curation/summarization of the duo transcript itself (the context grows until the model limit); if the same persona is active in the solo chat and in a duo simultaneously, notebook writes follow a last-writer-wins rule.
+**Design Choice**: A separate model class (rather than extending `ChatModel`) keeps the human-facing logic single-perspective and untouched, while `MemoryCurator` factors the curation cycle they both share.
+
+**Known limitations**: selecting the same interlocutor on both sides is rejected (both sides would read and write the same journal and memory files concurrently — create a second configuration of the same model under another name for self-dialogue); if the same persona is active in the solo chat and in a duo simultaneously, notebook writes follow a last-writer-wins rule.
 
 ### 3.4. Interlocutor (Abstract Base Class)
 **Role**: AI Provider Abstraction.
@@ -131,11 +137,12 @@ This is Tether's defining feature. Standard chat clients send the entire availab
 
 1.  **Active Journal (Live Memory)**: Recent messages are kept verbatim in the `ChatModel`.
 2.  **Threshold Check**: When the token count of the Active Journal exceeds a defined trigger (e.g., 12k tokens), the **Curation** process begins.
-3.  **Culling**: The oldest messages are removed from the Active Journal until the token count drops below the target (e.g., 10k tokens).
+3.  **Culling**: The oldest messages are removed from the Active Journal until the token count drops below the target (e.g., 10k tokens). The culling happens **in memory only** at this stage: the `.jsonl` journal file is not rewritten yet.
 4.  **Summarization**:
     - The culled messages are combined with the *existing* Long-Term Memory.
     - The AI is asked to produce a **new** unified summary that integrates the old memory with the events of the culled messages.
-    - This new summary replaces the old Long-Term Memory.
+    - This new summary replaces the old Long-Term Memory (after a timestamped backup of the previous version).
+    - Only once the summary is saved successfully is the journal file rewritten without the culled messages. If the summarization fails (error, incomplete or empty answer, save failure), the culled messages are restored into the Active Journal so that no content is ever lost without a summary. `ChatModel` and `DuoChatModel` both follow this scheme.
 5.  **Context Injection**: For every new request, the current Long-Term Memory is injected into the system prompt (or a dedicated memory block), ensuring the AI "remembers" the entire history, albeit in a compressed form.
 
 **Why this way?**

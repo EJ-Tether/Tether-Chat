@@ -40,6 +40,30 @@ ChatManager::ChatManager(QObject *parent)
         dir.mkpath(".");
     }
 
+    // Le duo écrit dans les journaux solo des participants ; si l'interlocuteur
+    // actif du chat principal y participe, son ChatModel doit être rechargé
+    // depuis le disque. On le fait dès que la session duo est au repos.
+    connect(m_duoChatModel, &DuoChatModel::journalUpdated, this,
+            [this](const QString &name)
+            {
+                if (name != m_activeInterlocutorName)
+                    return;
+                if (!m_duoChatModel->running() && !m_duoChatModel->busy())
+                    m_chatModel->reloadFromDisk();
+                else
+                    m_duoSoloReloadPending = true;
+            });
+    auto reloadSoloWhenIdle = [this]()
+    {
+        if (m_duoSoloReloadPending && !m_duoChatModel->running() && !m_duoChatModel->busy())
+        {
+            m_duoSoloReloadPending = false;
+            m_chatModel->reloadFromDisk();
+        }
+    };
+    connect(m_duoChatModel, &DuoChatModel::runningChanged, this, reloadSoloWhenIdle);
+    connect(m_duoChatModel, &DuoChatModel::busyChanged, this, reloadSoloWhenIdle);
+
     loadInterlocutorsFromDisk();
 
     if (m_interlocutors.isEmpty())
@@ -264,42 +288,66 @@ QString ChatManager::buildDuoSystemPrompt(InterlocutorConfig *config,
     return personaCorePreamble() + config->systemPrompt() +
            QString("\n\nYou can chat with different people; the person you're chatting with "
                    "right now is: %1. %1 is another AI, connected to you through the Tether "
-                   "application. The human user who set up this conversation may read it, but "
-                   "will not take part in it: your messages are delivered directly to %1.")
+                   "application. In the conversation history, messages coming from %1 are "
+                   "prefixed with \"[%1]: \"; unprefixed user messages come from your human "
+                   "user. The human who set up this conversation may read it, but will not "
+                   "take part in it: your messages are delivered directly to %1.")
                .arg(partnerName);
+}
+
+// Construit la fiche d'un participant duo : instance dédiée, prompt adapté,
+// chemins de fichiers (journal + mémoire = LES MÊMES que le chat solo, pour la
+// continuité d'identité), et seuils de curation issus du registre de modèles.
+DuoChatModel::ParticipantSpec ChatManager::makeDuoSpec(InterlocutorConfig *config,
+                                                       const QString &partnerName)
+{
+    DuoChatModel::ParticipantSpec spec;
+    spec.name = config->name();
+    spec.interlocutor = createInterlocutorFromConfig(config);
+    spec.interlocutor->setSystemPrompt(buildDuoSystemPrompt(config, partnerName));
+    spec.journalPath = m_chatFilesPath + "/" + config->name() + ".jsonl";
+    spec.memoryPath = m_chatFilesPath + "/" + config->name() + "_memory.txt";
+
+    ModelInfo modelInfo = m_modelRegistry.findModel(config->modelName());
+    if (modelInfo.curationTriggerTokenCount > modelInfo.curationTargetTokenCount)
+    {
+        spec.curationTriggerTokens = modelInfo.curationTriggerTokenCount;
+        spec.curationTargetTokens = modelInfo.curationTargetTokenCount;
+    }
+    else
+    {
+        qWarning() << "makeDuoSpec: no valid curation thresholds for" << config->modelName()
+                   << "- using defaults.";
+    }
+    return spec;
 }
 
 void ChatManager::selectDuoPair(const QString &nameA, const QString &nameB)
 {
-    if (nameA.isEmpty() || nameB.isEmpty() || nameA == nameB)
+    if (m_duoChatModel->curationPending())
     {
-        qWarning() << "selectDuoPair: invalid pair:" << nameA << "/" << nameB;
+        qWarning() << "selectDuoPair refused: a memory curation is pending.";
         return;
     }
 
     InterlocutorConfig *configA = peekConfigByName(nameA);
     InterlocutorConfig *configB = peekConfigByName(nameB);
-    if (!configA || !configB)
+
+    if (nameA.isEmpty() || nameB.isEmpty() || nameA == nameB || !configA || !configB)
     {
-        qWarning() << "selectDuoPair: unknown interlocutor config:" << nameA << "or" << nameB;
+        // Sélection invalide (notamment deux fois le même interlocuteur : les
+        // deux côtés partageraient journal et mémoire). On invalide la session
+        // pour que l'UI reflète exactement la sélection des combos.
+        qWarning() << "selectDuoPair: invalid pair:" << nameA << "/" << nameB;
+        m_duoChatModel->clearParticipants();
         return;
     }
 
     // Instances dédiées : la conversation duo ne doit partager ni le system
     // prompt ni les signaux réseau avec l'interlocuteur actif du chat principal.
-    Interlocutor *interlocutorA = createInterlocutorFromConfig(configA);
-    Interlocutor *interlocutorB = createInterlocutorFromConfig(configB);
-    interlocutorA->setSystemPrompt(buildDuoSystemPrompt(configA, nameB));
-    interlocutorB->setSystemPrompt(buildDuoSystemPrompt(configB, nameA));
-
-    // Chaque IA reçoit (en lecture seule) la mémoire ancienne issue de sa
-    // relation avec l'utilisateur : elle arrive dans le dialogue "en étant elle-même".
-    const QString memoryPathA = m_chatFilesPath + "/" + nameA + "_memory.txt";
-    const QString memoryPathB = m_chatFilesPath + "/" + nameB + "_memory.txt";
     const QString transcriptPath = m_chatFilesPath + "/duo_" + nameA + "__" + nameB + ".jsonl";
-
-    m_duoChatModel->setParticipants(nameA, interlocutorA, memoryPathA, nameB, interlocutorB,
-                                    memoryPathB, transcriptPath);
+    m_duoChatModel->setParticipants(makeDuoSpec(configA, nameB), makeDuoSpec(configB, nameA),
+                                    transcriptPath);
 }
 
 InterlocutorConfig *ChatManager::findConfigByName(const QString &configName)

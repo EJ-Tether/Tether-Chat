@@ -22,8 +22,17 @@ ApplicationWindow {
 
     property var currentChatModel: _chatManager.chatModel
 
+    // L'interlocuteur actif du chat principal est-il occupé dans une session
+    // AI ↔ AI ? Dans ce cas on verrouille l'envoi solo : son journal est en
+    // train d'être écrit par la conversation duo.
+    property bool soloLockedByDuo: (_chatManager.duoChatModel.running || _chatManager.duoChatModel.busy)
+                                   && (_chatManager.activeInterlocutorName === _chatManager.duoChatModel.participantA
+                                       || _chatManager.activeInterlocutorName === _chatManager.duoChatModel.participantB)
+
     // Fonction pour envoyer le message
     function sendMessage() {
+        if (_root.soloLockedByDuo)
+            return;
         var text = messageInput.text.trim();
         if (text.length > 0) {
             currentChatModel.sendMessage(text);
@@ -317,7 +326,9 @@ ApplicationWindow {
                                     height: 150
                                     width: parent.width - 70
                                     wrapMode: Text.WordWrap
-                                    placeholderText: "Saisissez votre message ici..."
+                                    placeholderText: _root.soloLockedByDuo
+                                                     ? qsTr("This interlocutor is currently talking in the AI ↔ AI tab…")
+                                                     : "Saisissez votre message ici..."
 
                                     Keys.onPressed: (event) => {
                                         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
@@ -362,7 +373,7 @@ ApplicationWindow {
                                 }
 
                                 onClicked: sendMessage()
-                                enabled: messageInput.text.trim().length > 0
+                                enabled: messageInput.text.trim().length > 0 && !_root.soloLockedByDuo
                             }
                             Item {
                                 id: verticalFiller
@@ -540,9 +551,11 @@ ApplicationWindow {
                 spacing: 0
                 visible: _tabBar.currentIndex === 1
 
+                // On appelle toujours le C++ : une paire invalide (par exemple
+                // deux fois le même interlocuteur) invalide la session, pour que
+                // l'état du bouton Start reflète exactement la sélection.
                 function trySelectPair() {
-                    if (_duoComboA.currentIndex >= 0 && _duoComboB.currentIndex >= 0
-                            && _duoComboA.currentText !== _duoComboB.currentText) {
+                    if (_duoComboA.currentIndex >= 0 && _duoComboB.currentIndex >= 0) {
                         _chatManager.selectDuoPair(_duoComboA.currentText, _duoComboB.currentText);
                     }
                 }
@@ -562,6 +575,7 @@ ApplicationWindow {
                             model: _chatManager.interlocutorNames
                             currentIndex: -1
                             enabled: !_chatManager.duoChatModel.running && !_chatManager.duoChatModel.busy
+                                     && !_chatManager.duoChatModel.curationPending
                             onActivated: _duoArea.trySelectPair()
                         }
                         Label {
@@ -575,6 +589,7 @@ ApplicationWindow {
                             model: _chatManager.interlocutorNames
                             currentIndex: -1
                             enabled: !_chatManager.duoChatModel.running && !_chatManager.duoChatModel.busy
+                                     && !_chatManager.duoChatModel.curationPending
                             onActivated: _duoArea.trySelectPair()
                         }
 
@@ -619,7 +634,7 @@ ApplicationWindow {
                     y: Math.round((parent.height - height) / 2)
 
                     Label {
-                        text: qsTr("The whole conversation between %1 and %2 will be permanently deleted.")
+                        text: qsTr("The AI ↔ AI transcript between %1 and %2 will be deleted from this tab.\nEach AI keeps its own memory of the exchange in its personal journal.")
                               .arg(_chatManager.duoChatModel.participantA)
                               .arg(_chatManager.duoChatModel.participantB)
                         wrapMode: Text.Wrap
@@ -761,6 +776,11 @@ ApplicationWindow {
                                        .arg(_chatManager.duoChatModel.participantA)
                                        .arg(_chatManager.duoChatModel.participantB)
                                      : qsTr("Select two different interlocutors to begin"))
+                        }
+                        Label {
+                            visible: _chatManager.duoChatModel.curationPending
+                            text: qsTr(" • memory curation in progress…")
+                            color: "#FF9800"
                         }
                         Item { Layout.fillWidth: true }
                         Label {

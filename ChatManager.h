@@ -110,6 +110,9 @@ private:
     // Recherche une config sans effet de bord (ne touche pas m_currentConfig)
     InterlocutorConfig *peekConfigByName(const QString &configName) const;
     QString buildDuoSystemPrompt(InterlocutorConfig *config, const QString &partnerName) const;
+    DuoChatModel::ParticipantSpec makeDuoSpec(InterlocutorConfig *config,
+                                              const QString &partnerName);
+    bool m_duoSoloReloadPending = false;
     InterlocutorConfig *m_currentConfig = nullptr; // Pointeur vers la config en cours d'édition
     QList<InterlocutorConfig *> m_allConfigs;      // La liste de toutes les configurations
     ModelRegistry m_modelRegistry;
