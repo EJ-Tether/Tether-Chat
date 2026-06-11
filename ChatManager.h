@@ -3,6 +3,7 @@
 #define CHATMANAGER_H
 
 #include "ChatModel.h"
+#include "DuoChatModel.h"
 #include "Interlocutor.h"
 #include <QMap>
 #include <QObject>
@@ -22,6 +23,9 @@ public:
 
     // Propriété pour le ChatModel, exposé à QML
     Q_PROPERTY(ChatModel *chatModel READ chatModel CONSTANT)
+
+    // Propriété pour le modèle de conversation IA-IA, exposé à QML
+    Q_PROPERTY(DuoChatModel *duoChatModel READ duoChatModel CONSTANT)
 
     // Propriété pour la liste des noms d'interlocuteurs, pour un ComboBox en QML
     Q_PROPERTY(QStringList interlocutorNames READ interlocutorNames NOTIFY interlocutorNamesChanged)
@@ -45,6 +49,11 @@ public:
     // Méthode Q_INVOKABLE pour changer l'interlocuteur depuis QML
     Q_INVOKABLE void switchToInterlocutor(const QString &name);
 
+    // Prépare une session de conversation IA-IA entre deux interlocuteurs
+    // configurés. Crée des instances dédiées (indépendantes du chat principal)
+    // et charge la transcription duo correspondante.
+    Q_INVOKABLE void selectDuoPair(const QString &nameA, const QString &nameB);
+
     // Méthodes Q_INVOKABLE pour l'onglet de configuration
     Q_INVOKABLE void selectConfigToEdit(const QString &name);
     Q_INVOKABLE void createNewConfig();
@@ -57,6 +66,7 @@ public:
     QStringList availableInterlocutorTypes() const;
 
     ChatModel *chatModel() const { return m_chatModel; }
+    DuoChatModel *duoChatModel() const { return m_duoChatModel; }
     QStringList interlocutorNames() const;
     QString activeInterlocutorName() const { return m_activeInterlocutorName; }
 
@@ -83,6 +93,7 @@ signals:
 
 private:
     ChatModel *m_chatModel;
+    DuoChatModel *m_duoChatModel;
     QMap<QString, Interlocutor *> m_interlocutors; // Stocke tous les interlocuteurs par nom
     QString m_activeInterlocutorName;
 
@@ -96,6 +107,9 @@ private:
     void loadInterlocutorsFromDisk();
 
     Interlocutor *createInterlocutorFromConfig(InterlocutorConfig *config);
+    // Recherche une config sans effet de bord (ne touche pas m_currentConfig)
+    InterlocutorConfig *peekConfigByName(const QString &configName) const;
+    QString buildDuoSystemPrompt(InterlocutorConfig *config, const QString &partnerName) const;
     InterlocutorConfig *m_currentConfig = nullptr; // Pointeur vers la config en cours d'édition
     QList<InterlocutorConfig *> m_allConfigs;      // La liste de toutes les configurations
     ModelRegistry m_modelRegistry;

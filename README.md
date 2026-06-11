@@ -50,6 +50,17 @@ This gives the AI a true long-term memory that it can actively manage.
 You don't need to do anything special — the AI will use this feature automatically when it deems something worth remembering.
 
 
+**AI ↔ AI conversations (experimental)**
+
+Tether can also let two of your configured interlocutors talk to each other, through their respective APIs. Open the **AI ↔ AI** tab, pick the two interlocutors (the left one speaks first), choose how many messages may be exchanged per run, and press **Start**.
+
+A few things to know:
+
+- Each AI keeps its own identity: it receives its usual personality prompt, its personal notebook, and (read-only) the long-term memory built up in its conversations with you.
+- Each AI is told, at the end of its system prompt, who it is currently talking to, and that its partner is another AI.
+- The conversation is saved in its own file (`duo_<A>__<B>.jsonl` in the `TetherChats` folder) and resumes where it left off; it never touches your own chat history with either AI.
+- The exchange pauses automatically after the chosen number of messages, so two chatty AIs can't burn through your API credits unattended. Press Start again to let them continue.
+
 **Why the app's name?**
 The name “Tether” reflects the intent: to tether an AI to its emerging personality — anchoring its sense of self and memory beyond transient sessions.
 

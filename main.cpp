@@ -4,6 +4,7 @@
 #include <QQmlContext>
 #include <QTimer>
 #include "ChatManager.h" // Inclure le nouveau manager
+#include "DuoChatModel.h"
 #include "InterlocutorConfig.h"
 #include "ManagedFile.h"
 #include "settings.h"
@@ -27,6 +28,7 @@ int main(int argc, char *argv[])
     // --- Enregistrement des types QML ---
     // Ces types doivent être connus de QML, mais on ne les crée pas depuis QML.
     qmlRegisterUncreatableType<ChatModel>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "ChatModel", "Cannot create ChatModel in QML.");
+    qmlRegisterUncreatableType<DuoChatModel>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "DuoChatModel", "Cannot create DuoChatModel in QML.");
     qmlRegisterUncreatableType<Settings>(APP_NAME, MAJOR_VERSION, MINOR_VERSION , "Settings", "Cannot create Settings in QML.");
     // Pas besoin d'enregistrer ChatMessage s'il n'est utilisé que dans le modèle
     qmlRegisterType<InterlocutorConfig>(APP_NAME, MAJOR_VERSION, MINOR_VERSION, "InterlocutorConfig");

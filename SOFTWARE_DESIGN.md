@@ -25,6 +25,7 @@ graph TD
     subgraph Backend [Backend_C++]
         CM[ChatManager]
         Model[ChatModel]
+        Duo[DuoChatModel]
         Int[Interlocutor Abstract]
         OpenAI[OpenAIInterlocutor]
         Google[GoogleAIInterlocutor]
@@ -39,12 +40,16 @@ graph TD
 
     UI <--> CM
     UI <--> Model
+    UI <--> Duo
     CM --> Model
+    CM --> Duo
     CM --> Config
     Model --> Int
+    Duo --> Int
     Int <--> OpenAI
     Int <--> Google
     Model <--> Storage
+    Duo <--> Storage
     CM <--> Storage
 ```
 
@@ -82,7 +87,28 @@ graph TD
 
 **Design Choice**: Coupling the message storage with the rolling context logic in `ChatModel` ensures that the UI always reflects the exact state of the conversation, including when messages are culled for summarization.
 
-### 3.3. Interlocutor (Abstract Base Class)
+### 3.3. DuoChatModel (AI ↔ AI Conversations)
+**Role**: Orchestrator of conversations between two AI interlocutors.
+
+- Inherits from `QAbstractListModel` to feed the dedicated "AI ↔ AI" tab.
+
+- Maintains a single shared transcript in which every message is tagged with its **speaker's name** (`ChatMessage::speaker`).
+
+- For each API request, converts the transcript to the point of view of the side about to speak: its own messages become `assistant` turns, the partner's messages become `user` turns. This keeps every `Interlocutor` subclass completely unchanged (including the strict user/assistant alternation required by the Anthropic API).
+
+- Owns **dedicated `Interlocutor` instances**, created by `ChatManager::selectDuoPair()` from the same `InterlocutorConfig`s as the main chat. This guarantees that signals, pending network replies, and system prompts never interfere with the human-facing `ChatModel`.
+
+- The conversation opener is a **synthetic kick-off prompt** ("You're now in conversation with X, you may initiate the conversation with a first message.") regenerated on the fly for the side that spoke first. It is never persisted, so the partner never sees it and reloaded conversations stay consistent.
+
+- Each side receives, **read-only**, its own ancient memory file (`<name>_memory.txt`) and keeps its personal notebook: the persona arrives in the dialogue "as itself".
+
+- A per-run **message budget** (`maxTurns`, persisted via QSettings) auto-pauses the exchange, keeping the user in control of token spending.
+
+**Design Choice**: A separate model class (rather than extending `ChatModel`) keeps the rolling-context/curation logic single-perspective and untouched. Duo transcripts are stored in their own files (`duo_<A>__<B>.jsonl`) so the human↔AI relationship files are never polluted.
+
+**Known limitations (v1)**: no curation/summarization of the duo transcript itself (the context grows until the model limit); if the same persona is active in the solo chat and in a duo simultaneously, notebook writes follow a last-writer-wins rule.
+
+### 3.4. Interlocutor (Abstract Base Class)
 **Role**: AI Provider Abstraction.
 
 - Defines the interface for communicating with different LLM providers (`sendRequest`, `uploadFile`).
@@ -91,7 +117,7 @@ graph TD
 
 **Design Choice**: This polymorphism allows Tether to be easily extended to support new providers (e.g., Anthropic, Mistral, Local LLMs via Ollama) without modifying the core `ChatManager` or `ChatModel` logic.
 
-### 3.4. InterlocutorConfig & ModelRegistry
+### 3.5. InterlocutorConfig & ModelRegistry
 **Role**: Configuration Management.
 
 - `InterlocutorConfig`: Stores settings for a specific persona (Name, API Key, System Prompt, Model).

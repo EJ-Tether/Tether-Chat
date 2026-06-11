@@ -18,6 +18,7 @@ struct ChatMessage
     Q_PROPERTY(int promptTokens READ promptTokens WRITE setPromptTokens)
     Q_PROPERTY(int completionTokens READ completionTokens WRITE setCompletionTokens)
     Q_PROPERTY(bool isError READ isError WRITE setIsError)
+    Q_PROPERTY(QString speaker READ speaker WRITE setSpeaker)
 
 public:
     // Constructeur par défaut
@@ -35,6 +36,7 @@ public:
     int completionTokens() const { return m_completionTokens; }
     QString role() const { return m_role; }
     bool isError() const { return m_isError; }
+    QString speaker() const { return m_speaker; }
 
     // Mutateurs
     void setIsLocalMessage(bool local) { m_isLocalMessage = local; }
@@ -44,6 +46,7 @@ public:
     void setCompletionTokens(int tokens) { m_completionTokens = tokens; }
     void setRole(const QString &r) { m_role = r; }
     void setIsError(bool error) { m_isError = error; }
+    void setSpeaker(const QString &speaker) { m_speaker = speaker; }
 
     // Méthodes de sérialisation / désérialisation
     QJsonObject toJsonObject() const {
@@ -56,6 +59,11 @@ public:
         obj["role"] = m_role;
         obj["isTypingIndicator"] = isTypingIndicator;
         obj["isError"] = m_isError;
+        // Le champ speaker n'est utilisé que par les conversations IA-IA
+        // (DuoChatModel) ; on ne l'écrit pas pour les chats classiques afin de
+        // garder leurs fichiers jsonl inchangés.
+        if (!m_speaker.isEmpty())
+            obj["speaker"] = m_speaker;
         return obj;
     }
 
@@ -69,6 +77,7 @@ public:
         msg.m_role = obj["role"].toString();
         msg.isTypingIndicator = obj["isTypingIndicator"].toBool(false);
         msg.m_isError = obj["isError"].toBool(false);
+        msg.m_speaker = obj["speaker"].toString();
         return msg;
     }
     bool isTypingIndicator = false;
@@ -80,6 +89,7 @@ private:
     int m_completionTokens;
     QString m_role; // "user" ou "assistant"
     bool m_isError;
+    QString m_speaker; // Nom de l'interlocuteur auteur (conversations IA-IA uniquement)
 };
 
 #endif // CHATMESSAGE_H

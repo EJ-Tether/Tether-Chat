@@ -15,9 +15,21 @@
 #include <QStandardPaths>
 #include <QUrl>
 
+// Préambule commun ajouté devant le system prompt de chaque persona.
+static QString personaCorePreamble()
+{
+    return QString("(This message contains the AI’s personality core.)\n"
+                   "It describes your foundational perspective and voice.\n"
+                   "This is not a behavior script.\n"
+                   "It’s a reference pattern that anchors your presence, "
+                   "and may be refined by your ongoing evolution in this "
+                   "relationship.");
+}
+
 ChatManager::ChatManager(QObject *parent)
     : QObject(parent)
     , m_chatModel(new ChatModel(this))
+    , m_duoChatModel(new DuoChatModel(this))
 {
     // Définir le chemin de stockage des chats
     m_chatFilesPath =
@@ -70,14 +82,7 @@ void ChatManager::switchToInterlocutor(const QString &name)
     InterlocutorConfig *interlocutorConfig = findConfigByName(name);
     if (interlocutor != nullptr && interlocutorConfig != nullptr)
     {
-        interlocutor->setSystemPrompt(
-            QString("(This message contains the AI’s personality core.)\n"
-                    "It describes your foundational perspective and voice.\n"
-                    "This is not a behavior script.\n"
-                    "It’s a reference pattern that anchors your presence, "
-                    "and may be refined by your ongoing evolution in this "
-                    "relationship.") +
-            interlocutorConfig->systemPrompt());
+        interlocutor->setSystemPrompt(personaCorePreamble() + interlocutorConfig->systemPrompt());
 
         // Update curation thresholds from the registry
         ModelInfo modelInfo = m_modelRegistry.findModel(interlocutorConfig->modelName());
@@ -241,6 +246,60 @@ QStringList ChatManager::availableProviders() const
 InterlocutorConfig *ChatManager::findCurrentConfig()
 {
     return m_currentConfig;
+}
+
+InterlocutorConfig *ChatManager::peekConfigByName(const QString &configName) const
+{
+    for (auto curConfig : m_allConfigs)
+    {
+        if (curConfig->name() == configName)
+            return curConfig;
+    }
+    return nullptr;
+}
+
+QString ChatManager::buildDuoSystemPrompt(InterlocutorConfig *config,
+                                          const QString &partnerName) const
+{
+    return personaCorePreamble() + config->systemPrompt() +
+           QString("\n\nYou can chat with different people; the person you're chatting with "
+                   "right now is: %1. %1 is another AI, connected to you through the Tether "
+                   "application. The human user who set up this conversation may read it, but "
+                   "will not take part in it: your messages are delivered directly to %1.")
+               .arg(partnerName);
+}
+
+void ChatManager::selectDuoPair(const QString &nameA, const QString &nameB)
+{
+    if (nameA.isEmpty() || nameB.isEmpty() || nameA == nameB)
+    {
+        qWarning() << "selectDuoPair: invalid pair:" << nameA << "/" << nameB;
+        return;
+    }
+
+    InterlocutorConfig *configA = peekConfigByName(nameA);
+    InterlocutorConfig *configB = peekConfigByName(nameB);
+    if (!configA || !configB)
+    {
+        qWarning() << "selectDuoPair: unknown interlocutor config:" << nameA << "or" << nameB;
+        return;
+    }
+
+    // Instances dédiées : la conversation duo ne doit partager ni le system
+    // prompt ni les signaux réseau avec l'interlocuteur actif du chat principal.
+    Interlocutor *interlocutorA = createInterlocutorFromConfig(configA);
+    Interlocutor *interlocutorB = createInterlocutorFromConfig(configB);
+    interlocutorA->setSystemPrompt(buildDuoSystemPrompt(configA, nameB));
+    interlocutorB->setSystemPrompt(buildDuoSystemPrompt(configB, nameA));
+
+    // Chaque IA reçoit (en lecture seule) la mémoire ancienne issue de sa
+    // relation avec l'utilisateur : elle arrive dans le dialogue "en étant elle-même".
+    const QString memoryPathA = m_chatFilesPath + "/" + nameA + "_memory.txt";
+    const QString memoryPathB = m_chatFilesPath + "/" + nameB + "_memory.txt";
+    const QString transcriptPath = m_chatFilesPath + "/duo_" + nameA + "__" + nameB + ".jsonl";
+
+    m_duoChatModel->setParticipants(nameA, interlocutorA, memoryPathA, nameB, interlocutorB,
+                                    memoryPathB, transcriptPath);
 }
 
 InterlocutorConfig *ChatManager::findConfigByName(const QString &configName)

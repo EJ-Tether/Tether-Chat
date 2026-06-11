@@ -25,6 +25,7 @@ qt_add_qml_module(appTether
         SOURCES DummyInterlocutor.h DummyInterlocutor.cpp
         SOURCES ChatMessage.h
         SOURCES ChatModel.h ChatModel.cpp
+        SOURCES DuoChatModel.h DuoChatModel.cpp
         SOURCES OpenAIInterlocutor.h OpenAIInterlocutor.cpp
         SOURCES DeepSeekInterlocutor.h DeepSeekInterlocutor.cpp
         SOURCES ChatManager.cpp ChatManager.h

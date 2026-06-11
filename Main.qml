@@ -59,6 +59,11 @@ ApplicationWindow {
                 }
                 TabButton {
                     font.bold: checked
+                    text: qsTr("AI ↔ AI")
+                    width: implicitWidth
+                }
+                TabButton {
+                    font.bold: checked
                     text: qsTr("Configure")
                     width: implicitWidth
                 }
@@ -525,16 +530,256 @@ ApplicationWindow {
 
             } // end _chatAreaRow RowLayout
 
-            // 1.2.2 `_configArea` : Configuration form: IP address of the API endpoint, API Key,
+            // 1.2.2 `_duoArea` : AI ↔ AI conversation area. Two configured interlocutors
+            // talk to each other through their respective APIs. The human selects the
+            // pair, sets a message budget per run, and starts/pauses the exchange.
+            ColumnLayout {
+                id: _duoArea
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
+                visible: _tabBar.currentIndex === 1
+
+                function trySelectPair() {
+                    if (_duoComboA.currentIndex >= 0 && _duoComboB.currentIndex >= 0
+                            && _duoComboA.currentText !== _duoComboB.currentText) {
+                        _chatManager.selectDuoPair(_duoComboA.currentText, _duoComboB.currentText);
+                    }
+                }
+
+                // Barre de contrôle de la session duo
+                Frame {
+                    Layout.fillWidth: true
+
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 10
+
+                        Label { text: qsTr("First speaker:") }
+                        ComboBox {
+                            id: _duoComboA
+                            Layout.preferredWidth: 170
+                            model: _chatManager.interlocutorNames
+                            currentIndex: -1
+                            enabled: !_chatManager.duoChatModel.running && !_chatManager.duoChatModel.busy
+                            onActivated: _duoArea.trySelectPair()
+                        }
+                        Label {
+                            text: "↔"
+                            font.pixelSize: 18
+                            font.bold: true
+                        }
+                        ComboBox {
+                            id: _duoComboB
+                            Layout.preferredWidth: 170
+                            model: _chatManager.interlocutorNames
+                            currentIndex: -1
+                            enabled: !_chatManager.duoChatModel.running && !_chatManager.duoChatModel.busy
+                            onActivated: _duoArea.trySelectPair()
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        Label { text: qsTr("Messages per run:") }
+                        SpinBox {
+                            id: _duoTurnsSpin
+                            from: 1
+                            to: 200
+                            editable: true
+                            value: _chatManager.duoChatModel.maxTurns
+                            onValueModified: _chatManager.duoChatModel.maxTurns = value
+                        }
+
+                        Button {
+                            id: _duoStartButton
+                            text: _chatManager.duoChatModel.running ? qsTr("Pause") : qsTr("Start")
+                            highlighted: true
+                            enabled: _chatManager.duoChatModel.sessionReady
+                            onClicked: _chatManager.duoChatModel.running
+                                       ? _chatManager.duoChatModel.pause()
+                                       : _chatManager.duoChatModel.start()
+                        }
+                        Button {
+                            text: qsTr("Clear")
+                            enabled: _chatManager.duoChatModel.sessionReady
+                                     && !_chatManager.duoChatModel.running
+                                     && !_chatManager.duoChatModel.busy
+                            onClicked: _duoClearConfirm.open()
+                        }
+                    }
+                }
+
+                Dialog {
+                    id: _duoClearConfirm
+                    title: qsTr("Clear this AI ↔ AI conversation?")
+                    modal: true
+                    standardButtons: Dialog.Yes | Dialog.No
+                    parent: Overlay.overlay
+                    x: Math.round((parent.width - width) / 2)
+                    y: Math.round((parent.height - height) / 2)
+
+                    Label {
+                        text: qsTr("The whole conversation between %1 and %2 will be permanently deleted.")
+                              .arg(_chatManager.duoChatModel.participantA)
+                              .arg(_chatManager.duoChatModel.participantB)
+                        wrapMode: Text.Wrap
+                    }
+                    onAccepted: _chatManager.duoChatModel.clearConversation()
+                }
+
+                // Zone des messages duo
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: "#FAFAFA"
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        ListView {
+                            id: _duoListView
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            Layout.margins: 10
+                            spacing: 15
+                            clip: true
+                            model: _chatManager.duoChatModel
+                            onCountChanged: Qt.callLater(positionViewAtEnd)
+                            Connections {
+                                target: _chatManager.duoChatModel
+                                function onModelReset() { Qt.callLater(_duoListView.positionViewAtEnd); }
+                            }
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AsNeeded
+                            }
+
+                            delegate: Item {
+                                implicitWidth: _duoListView.width
+                                implicitHeight: _duoBubble.height
+
+                                Rectangle {
+                                    id: _duoBubble
+                                    width: Math.min(Math.max(_duoText.implicitWidth, _duoSpeakerLabel.implicitWidth) + 20,
+                                                    parent.width * 0.8)
+                                    height: _duoContentColumn.implicitHeight + 20
+                                    radius: 12
+                                    border.width: 1
+                                    border.color: borderColor
+                                    // Participant A à gauche (vert pâle), participant B à droite (bleu pâle)
+                                    color: model.isError ? "#ffcdd2" : (model.isSideA ? "#e8f5e9" : aiMessageColor)
+                                    anchors.top: parent.top
+                                    anchors.left: model.isSideA ? parent.left : undefined
+                                    anchors.right: model.isSideA ? undefined : parent.right
+
+                                    Column {
+                                        id: _duoContentColumn
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        spacing: 4
+
+                                        Label {
+                                            id: _duoSpeakerLabel
+                                            text: model.speaker
+                                            font.bold: true
+                                            font.pixelSize: 11
+                                            color: "#757575"
+                                        }
+                                        TextEdit {
+                                            id: _duoText
+                                            width: _duoContentColumn.width
+                                            textFormat: Text.MarkdownText
+                                            text: model.text
+                                            wrapMode: Text.Wrap
+                                            font.pixelSize: 14
+                                            color: "#333333"
+                                            readOnly: true
+                                            selectByMouse: true
+                                        }
+                                    }
+
+                                    Button {
+                                        text: "⎘"
+                                        width: 15
+                                        height: 30
+                                        z: 1
+                                        visible: false
+                                        id: _duoCopyButton
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 25
+                                        anchors.topMargin: 5
+                                        background: Rectangle {
+                                            color: "#ffffff"
+                                            radius: 6
+                                            opacity: 0.8
+                                            border.color: "#cccccc"
+                                            z: -1
+                                        }
+                                        onClicked: _chatManager.copyToClipboard(model.text)
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.NoButton
+                                        cursorShape: Qt.IBeamCursor
+                                        onEntered: _duoCopyButton.visible = true
+                                        onExited: _duoCopyButton.visible = false
+                                    }
+                                }
+                            }
+                        }
+
+                        // Indicateur "X est en train d'écrire…"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: 8
+                            visible: _chatManager.duoChatModel.busy
+                            BusyIndicator {
+                                running: _chatManager.duoChatModel.busy
+                                Layout.preferredWidth: 24
+                                Layout.preferredHeight: 24
+                            }
+                            Label {
+                                text: qsTr("%1 is writing…").arg(_chatManager.duoChatModel.pendingSpeaker)
+                                color: "#757575"
+                            }
+                        }
+                    }
+                }
+
+                // Barre d'état de la session duo
+                Frame {
+                    Layout.fillWidth: true
+                    RowLayout {
+                        anchors.fill: parent
+                        Label {
+                            text: _chatManager.duoChatModel.running
+                                  ? qsTr("Running — %1 message(s) left in this run").arg(_chatManager.duoChatModel.turnsLeft)
+                                  : (_chatManager.duoChatModel.sessionReady
+                                     ? qsTr("Paused — press Start to let %1 and %2 talk")
+                                       .arg(_chatManager.duoChatModel.participantA)
+                                       .arg(_chatManager.duoChatModel.participantB)
+                                     : qsTr("Select two different interlocutors to begin"))
+                        }
+                        Item { Layout.fillWidth: true }
+                        Label {
+                            text: qsTr("Session cost: %1 tokens").arg(_chatManager.duoChatModel.cumulativeTokenCost)
+                        }
+                    }
+                }
+            } // end _duoArea
+
+            // 1.2.3 `_configArea` : Configuration form: IP address of the API endpoint, API Key,
             // Size of the rolling context, directories used for data storage, ...
             // ------------------------------
-            // 1.2.2 `_configArea` : Fenêtre de Configuration
+            // 1.2.3 `_configArea` : Fenêtre de Configuration
             RowLayout {
                 id: _configArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 10
-                visible: _tabBar.currentIndex === 1 // S'assurer que la visibilité est bien gérée
+                visible: _tabBar.currentIndex === 2 // S'assurer que la visibilité est bien gérée
                 // Fonction QML pour synchroniser les ComboBoxs de Provider et Model
                 function syncProviderModel() {
                     if (!_chatManager.currentConfig) return;
@@ -869,11 +1114,11 @@ ApplicationWindow {
                     }
                 }
             }
-            // 1.2.3 `_parametersArea` : Application behavior parameters
+            // 1.2.4 `_parametersArea` : Application behavior parameters
             // ------------------------------
             ScrollView {
                 id: _parametersArea
-                visible: _tabBar.currentIndex === 2
+                visible: _tabBar.currentIndex === 3
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
@@ -947,11 +1192,11 @@ ApplicationWindow {
                     Item { Layout.fillHeight: true }
                 }
             }
-            // 1.2.4 `_infoArea` : Information page, versions, details, URL of the github, ...
+            // 1.2.5 `_infoArea` : Information page, versions, details, URL of the github, ...
             // ------------------------------
             ScrollView {
                 id: _infoArea
-                visible: _tabBar.currentIndex === 3
+                visible: _tabBar.currentIndex === 4
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
