@@ -28,7 +28,8 @@ public:
         CompletionTokensRole,
         RoleRole, // "user" ou "assistant"
         IsTypingIndicatorRole,
-        IsErrorRole
+        IsErrorRole,
+        SpeakerRole // Nom de l'IA auteur (vide hors conversations IA-IA)
     };
     Q_ENUM(ChatMessageRoles)
 

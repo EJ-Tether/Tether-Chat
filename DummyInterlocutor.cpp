@@ -29,7 +29,7 @@ void DummyInterlocutor::sendRequest(const QList<ChatMessage> &history,
         const QString& lastPrompt = history.last().text();
         QString reversedPrompt = lastPrompt;
         std::reverse(reversedPrompt.begin(), reversedPrompt.end());
-        QString completionText = "Réponse bidon: " + reversedPrompt;
+        QString completionText = name() + " : " + reversedPrompt;
 
         // --- 2. Préparation de la structure de réponse propre (InterlocutorReply) ---
         InterlocutorReply cleanReply;

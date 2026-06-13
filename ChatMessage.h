@@ -13,6 +13,10 @@ struct ChatMessage
     Q_GADGET // Permet d'utiliser QVariant et d'autres fonctionnalités Qt avec cette structure
 
     Q_PROPERTY(bool isLocalMessage READ isLocalMessage WRITE setIsLocalMessage)
+    // isLocalMessage : false = l'IA propriétaire de ce journal ;
+    // true = son interlocuteur (l'humain en chat solo, l'IA partenaire en duo).
+    // Toujours apparié à role (assistant/user).
+
     Q_PROPERTY(QString text READ text WRITE setText)
     Q_PROPERTY(QDateTime timestamp READ timestamp WRITE setTimestamp)
     Q_PROPERTY(int promptTokens READ promptTokens WRITE setPromptTokens)

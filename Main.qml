@@ -17,6 +17,7 @@ ApplicationWindow {
     // Custom colors
     property color humanMessageColor: "#fff8e1"  // pale yellow
     property color aiMessageColor: "#e3f2fd"     // pale blue
+    property color partnerMessageColor: "#f3e5f5" // pale lavender — IA partenaire (chat IA↔IA relu en solo)
     property color borderColor: "#E0E0E0"
     property color sendButtonColor: "#2196F3"
 
@@ -201,10 +202,16 @@ ApplicationWindow {
                                     radius: 12
                                     border.width: 1
                                     border.color: borderColor
-                                    color: model.isError ? "#ffcdd2" : (model.isLocalMessage ? humanMessageColor : aiMessageColor)
+                                    // Un message d'une IA partenaire (conversation IA↔IA relue ici en
+                                    // solo) a isLocalMessage=true (rôle "user" côté API) MAIS un speaker
+                                    // renseigné, alors que l'humain n'a jamais de speaker. On le traite
+                                    // donc comme une IA : aligné à droite, mais dans sa propre couleur.
+                                    property bool isPartnerMessage: model.isLocalMessage && model.speaker !== ""
+                                    property bool isHumanMessage: model.isLocalMessage && model.speaker === ""
+                                    color: model.isError ? "#ffcdd2" : (isHumanMessage ? humanMessageColor : (isPartnerMessage ? partnerMessageColor : aiMessageColor))
                                     anchors.top: parent.top
-                                    anchors.left: model.isLocalMessage ? parent.left : undefined // Ancre à gauche si humain
-                                    anchors.right: model.isLocalMessage ? undefined : parent.right // Ancre à droite si IA
+                                    anchors.left: isHumanMessage ? parent.left : undefined // Ancre à gauche si humain
+                                    anchors.right: isHumanMessage ? undefined : parent.right // Ancre à droite si IA (propriétaire ou partenaire)
 
                                     TextEdit {
                                         id: _messageText

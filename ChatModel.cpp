@@ -119,6 +119,7 @@ QVariant ChatModel::data(const QModelIndex &index, int role) const
         case RoleRole: return message.role();
         case IsTypingIndicatorRole: return message.isTypingIndicator;
         case IsErrorRole: return message.isError();
+        case SpeakerRole: return message.speaker();
     }
     return QVariant();
 }
@@ -134,6 +135,7 @@ QHash<int, QByteArray> ChatModel::roleNames() const
     roles[RoleRole] = "role";
     roles[IsTypingIndicatorRole] = "isTypingIndicator";
     roles[IsErrorRole] = "isError";
+    roles[SpeakerRole] = "speaker";
     return roles;
 }
 
