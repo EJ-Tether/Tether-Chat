@@ -86,7 +86,8 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
             "Whenever you include 'NOTE{...}', 'QUESTION{...}', or 'IDEA{...}' in your responses, the "
             "text inside the curly braces will be appended to your personal notes. Each note is "
             "assigned a unique ID. If you wish to delete a note, simply output 'DELETE{<ID>}' in your "
-            "response. These notes are preserved across sessions and provided to you in every prompt. "
+            "response. When notes are deleted, the remaining notes are automatically renumbered sequentially. "
+            "These notes are preserved across sessions and provided to you in every prompt. "
             "Notes are optional—you don't have to include one with every message —but you can use them "
             "to keep track of things you want to remember over the long term. "
             "Here is the current state of your personal notes:\n\n" +
@@ -95,13 +96,23 @@ void DeepSeekInterlocutor::sendRequest(const QList<ChatMessage> &history,
     }
 
     // 4. Chat History
+    static const QRegularExpression noteCmdRe(R"([ \t]*(?:(?:NOTE|QUESTION|IDEA)\{.*?\}|DELETE\{\d+\}))",
+                                              QRegularExpression::DotMatchesEverythingOption);
     for (const ChatMessage &msg : history)
     {
         if (msg.isError() || msg.isTypingIndicator) continue;
 
         QJsonObject chatMsg;
         chatMsg["role"] = msg.isLocalMessage() ? "user" : "assistant";
-        chatMsg["content"] = msg.text();
+        QString content = msg.text();
+        if (!msg.isLocalMessage())
+        {
+            content.remove(noteCmdRe);
+            content.replace(QRegularExpression(R"([ \t]+\n)"), "\n");
+            content.replace(QRegularExpression(R"(\n{3,})"), "\n\n");
+            content = content.trimmed();
+        }
+        chatMsg["content"] = content;
         messages.append(chatMsg);
     }
 
@@ -211,7 +222,10 @@ void DeepSeekInterlocutor::loadNotes()
     QString content = file.readAll();
     file.close();
 
-    QRegularExpression re("^(\\d+):\\s+(.*?)(?=\\n^\\d+:\\s+|\\z)",
+    m_notes.clear();
+    m_nextNoteId = 1;
+
+    QRegularExpression re(R"(^(\d+):\s*(.*?)(?=\n^\d+:\s*|\z))",
                           QRegularExpression::MultilineOption |
                               QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator it = re.globalMatch(content);
@@ -220,6 +234,10 @@ void DeepSeekInterlocutor::loadNotes()
         QRegularExpressionMatch match = it.next();
         int id = match.captured(1).toInt();
         QString note = match.captured(2).trimmed();
+        while (m_notes.contains(id))
+        {
+            id++;
+        }
         m_notes[id] = note;
         if (id >= m_nextNoteId)
         {
@@ -263,12 +281,45 @@ QString DeepSeekInterlocutor::getNotesString() const
     return result;
 }
 
+void DeepSeekInterlocutor::renumberNotes()
+{
+    QMap<int, QString> renumbered;
+    int newId = 1;
+    for (auto it = m_notes.cbegin(); it != m_notes.cend(); ++it)
+    {
+        renumbered[newId++] = it.value();
+    }
+    m_notes = renumbered;
+    m_nextNoteId = newId;
+}
+
 QString DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
 {
     bool notesChanged = false;
+    bool deletedAny = false;
+
+    // Process Deletions: DELETE{id}
+    QRegularExpression delRe(R"(DELETE\{(\d+)\})");
+    QRegularExpressionMatchIterator delIt = delRe.globalMatch(replyText);
+    while (delIt.hasNext())
+    {
+        QRegularExpressionMatch match = delIt.next();
+        int id = match.captured(1).toInt();
+        if (m_notes.contains(id))
+        {
+            m_notes.remove(id);
+            deletedAny = true;
+            notesChanged = true;
+        }
+    }
+
+    if (deletedAny)
+    {
+        renumberNotes();
+    }
 
     // Process Additions: NOTE{...}, IDEA{...}, QUESTION{...}
-    QRegularExpression addRe("(?:NOTE|QUESTION|IDEA)\\{(.*?)\\}",
+    QRegularExpression addRe(R"((?:NOTE|QUESTION|IDEA)\{(.*?)\})",
                              QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator addIt = addRe.globalMatch(replyText);
     while (addIt.hasNext())
@@ -282,35 +333,18 @@ QString DeepSeekInterlocutor::processNotesFromReply(const QString &replyText)
         }
     }
 
-    // Process Deletions: DELETE{id}
-    QRegularExpression delRe("DELETE\\{(\\d+)\\}");
-    QRegularExpressionMatchIterator delIt = delRe.globalMatch(replyText);
-    while (delIt.hasNext())
-    {
-        QRegularExpressionMatch match = delIt.next();
-        int id = match.captured(1).toInt();
-        if (m_notes.contains(id))
-        {
-            m_notes.remove(id);
-            notesChanged = true;
-        }
-    }
-
     if (notesChanged)
     {
         saveNotes();
     }
 
-    // Strip note/delete tags from the displayed text only when the user has
-    // chosen not to display them (chat/displayNotesEnabled == false).
-    QSettings settings("Tether", "ChatApp");
-    if (!settings.value("chat/displayNotesEnabled", true).toBool())
-    {
-        QString cleanedText = replyText;
-        cleanedText.remove(addRe);
-        cleanedText.remove(delRe);
-        return cleanedText.trimmed();
-    }
-
-    return replyText;
+    // Strip note/delete commands from the message itself so they are not displayed
+    // in the chat, not saved to the chat jsonl file, and not resent to the AI in subsequent turns.
+    QString cleanedText = replyText;
+    QRegularExpression stripRe(R"([ \t]*(?:(?:NOTE|QUESTION|IDEA)\{.*?\}|DELETE\{\d+\}))",
+                               QRegularExpression::DotMatchesEverythingOption);
+    cleanedText.remove(stripRe);
+    cleanedText.replace(QRegularExpression(R"([ \t]+\n)"), "\n");
+    cleanedText.replace(QRegularExpression(R"(\n{3,})"), "\n\n");
+    return cleanedText.trimmed();
 }

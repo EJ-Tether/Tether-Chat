@@ -32,9 +32,10 @@ private:
     const int REQUEST_TIMEOUT_MS = 1200000;
 
     QMap<int, QString> m_notes;
-    int m_nextNoteId;
+    int m_nextNoteId = 1;
     void loadNotes();
     void saveNotes();
+    void renumberNotes();
     QString processNotesFromReply(const QString& replyText);
     QString getNotesString() const;
 };
